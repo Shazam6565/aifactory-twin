@@ -1,0 +1,319 @@
+# Architecture
+
+Layer strategy, composition decisions, and the reasoning behind each one.
+
+`README.md` says what this repo does. This document says **why it is shaped this way**, and is
+written so that every ordering decision can be defended rather than merely stated.
+
+---
+
+## 1. The one-paragraph version
+
+A component is a stack of independently ownable opinions over a single piece of vendor
+geometry, where the geometry is the *weakest* opinion and arrives through a lazily loadable
+payload. A scene is a stack of independently ownable opinions over a catalog of those
+components. Every question this architecture answers reduces to **"who is allowed to override
+whom, and what should I be able to read without loading the heavy data?"**
+
+---
+
+## 2. Composition primer — only the part that matters here
+
+USD resolves conflicting opinions by **LIVRPS** strength order, strongest first:
+
+| | Arc | Used here for |
+|---|---|---|
+| **L** | Local — the layer stack: a layer plus its `subLayers`, recursively | material, physics and domain opinions |
+| **I** | Inherits | — |
+| **V** | VariantSets | LOD switching (M4) |
+| **R** | References | scene → published components |
+| **P** | Payloads | component → geometry |
+| **S** | Specializes | — |
+
+Two consequences drive the entire design:
+
+1. **Local beats Payload, always.** Anything authored in a sublayer of the interface layer
+   outranks anything arriving through the payload arc — regardless of sublayer ordering, and
+   without needing to think about it. Layer *ordering* among the sublayers only matters for
+   resolving conflicts between the sublayers themselves.
+2. **Payloads can be unloaded; sublayers cannot.** `subLayers` are always composed. A payload
+   is load-gated per stage, which makes it the only arc that lets you compose a scene's
+   structure and metadata while leaving its geometry on disk.
+
+Within `subLayers`, **earlier in the list is stronger.**
+
+---
+
+## 3. Per-component layer stack
+
+```
+rack_gb300.usda                    ← interface layer; the only file a consumer names
+  subLayers = [
+      @./domain_electrical.usda@,  ← strongest sublayer
+      @./physics.usda@,
+      @./mtl.usda@                 ← weakest sublayer
+  ]
+
+  def Xform "rack_gb300" (
+      payload = @./geo.usdc@       ← weakest opinion overall, load-gated
+  )
+```
+
+### Why geometry is a payload and not a sublayer
+
+Because the two things that make this pipeline worth building both depend on it:
+
+- **Cost.** A validation pass that only checks electrical metadata must not pay to load four
+  million triangles. With geometry payloaded, checking domain rules across a 4096-rack hall
+  touches kilobytes.
+- **Swappability.** The payload target is a single line. When the vendor ships v2, that line
+  changes and nothing else does.
+
+A sublayer would give you neither. It composes unconditionally and it is not a natural
+substitution point.
+
+### Why geometry is the weakest opinion
+
+Because the vendor owns it and everyone else's work sits on top of it. If geometry were the
+strongest layer, every routine vendor update would clobber the colliders, masses, material
+bindings, semantic labels and power ratings authored above it — and a pipeline whose output is
+destroyed by its own inputs is worthless.
+
+Ordering the sublayers *domain → physics → materials* follows the same logic, from most
+site-specific to most generic. A site electrical engineer's declared power draw for their
+specific deployment should outrank a simulation default, which should outrank a look-dev
+default. In practice these three rarely author the same attribute; the ordering exists so that
+when they eventually do, the outcome is already decided and nobody has to negotiate.
+
+### The asset-root authoring rule
+
+> **Author load-independent data on the asset-root prim. Author geometry-dependent data on
+> descendants.**
+
+This is the sharpest constraint in the repo and it falls directly out of §2.
+
+The asset-root prim (`/rack_gb300`) is `def`-ed in the **interface layer**, so it exists whether
+or not the payload is loaded. Attributes authored on it in `domain_electrical.usda` — power
+draw, phase, heat output, cooling type — and `UsdPhysics.MassAPI` mass are therefore readable
+with geometry unloaded.
+
+Descendant prims (the meshes) only exist once the payload loads. So collision APIs, mesh
+approximations and material bindings are inherently load-dependent, and any `over` targeting
+them is inert until then.
+
+The practical payoff:
+
+| Query | Payload state | Cost |
+|---|---|---|
+| Total power draw of row B | unloaded | kilobytes |
+| Every rack declares phase and cooling type | unloaded | kilobytes |
+| Sum of rack draw ≤ PDU capacity | unloaded | kilobytes |
+| Every mesh has a bound material | **loaded** | full |
+| No mesh collider above 10k tris | **loaded** | full |
+
+The validation harness splits along exactly this line, which is why the domain gate can run on
+every commit and the structural gate can run less often. **This is a load-gating strategy that
+falls out of a governance decision** — and if the metadata had been authored one prim lower,
+none of it would work.
+
+---
+
+## 4. Scene layer stack
+
+```
+datahall.usda
+  subLayers = [
+      @./session.usda@,          ← strongest — runtime, ephemeral, gitignored
+      @./site_overrides.usda@,
+      @./layout.usda@,
+      @./catalog.usda@           ← weakest — references published components
+  ]
+```
+
+| Layer | Owner | Contains | Lifetime |
+|---|---|---|---|
+| `session.usda` | runtime / telemetry | live values: measured draw, temperatures, robot pose | ephemeral — **not committed** |
+| `site_overrides.usda` | site engineer | this deployment's deviations from catalog defaults | committed, per-site |
+| `layout.usda` | layout / planning | placement, rows, instancing, LOD variant selections | committed |
+| `catalog.usda` | asset pipeline | references to published components — the parts list | generated |
+
+Four owners, four files, no merge conflicts, and a strict answer to "who wins" that nobody has
+to litigate. `session.usda` is strongest and ephemeral on purpose: live telemetry should
+override design intent for display, and should never be mistaken for design intent when
+committed. It is in `.gitignore` for that reason, not by oversight.
+
+---
+
+## 5. Instancing policy
+
+> **Addressability decides. Not performance.**
+
+| | Scenegraph instancing | Point instancing |
+|---|---|---|
+| Mechanism | `prim.SetInstanceable(True)` on referenced prims | `UsdGeomPointInstancer` — prototypes + positions |
+| Keeps | prim structure, per-prim addressing, selection, per-instance overrides | extreme scale, minimal memory |
+| Loses | higher per-prim memory at extreme counts | per-instance addressing and overrides |
+| Used for | **racks, CDUs, PDUs, the robot** | **floor tiles, cable trays, ceiling fixtures** |
+
+For a twin used as a decision layer, an operator must be able to click rack B-14 and see its
+telemetry. Point instancing makes that hard — instances are not prims and cannot carry
+per-instance metadata or independent overrides. So racks get scenegraph instancing *despite*
+it being the more expensive option, and point instancing is reserved for things nobody
+addresses individually.
+
+Both paths are built and both are benchmarked (M4, M7). The benchmark exists to quantify what
+the addressability requirement costs — not to pick the winner. The requirement already picked it.
+
+---
+
+## 6. Provenance
+
+`assets/source/` is immutable. `assets/published/` is generated and never hand-edited. The link
+between them is `manifest.json`:
+
+```json
+{
+  "generated_utc": "...",
+  "pipeline_version": "...",
+  "usd_version": "...",
+  "components": {
+    "rack_gb300": {
+      "source": "assets/source/rack_gb300.usda",
+      "source_sha256": "...",
+      "published": "assets/published/components/rack_gb300/rack_gb300.usda",
+      "layers": ["geo.usdc", "mtl.usda", "physics.usda", "domain_electrical.usda"]
+    }
+  }
+}
+```
+
+This makes "which source produced this published asset, with which pipeline version" a lookup
+rather than an archaeology exercise, and makes the pipeline's output verifiable: re-running on
+unchanged sources must produce unchanged hashes. Determinism is a feature, and it is the reason
+prim naming is derived from source rather than from iteration order.
+
+---
+
+## 7. URDF gap analysis
+
+URDF describes a robot's kinematics and little else. Importing it to USD is the easy half;
+**the pipeline's value is in what gets authored afterwards.** This table is the answer to
+"what is lost on URDF import?"
+
+| Concern | URDF | Authored after import |
+|---|---|---|
+| Articulation root | kinematic tree only, no solver root | `UsdPhysics.ArticulationRootAPI` on the correct prim |
+| Joint drives | `effort` / `velocity` limits only | `UsdPhysics.DriveAPI` — type, stiffness, damping, target, max force |
+| Solver tuning | none | PhysX articulation settings — iteration counts, sleep threshold, stabilization |
+| Material identity | `<material>` with an RGBA colour | `UsdShade` network — albedo, roughness, metallic, normal |
+| Physics materials | friction only via vendor extensions, not core URDF | `UsdPhysics.MaterialAPI` — static/dynamic friction, restitution, bound to collision prims |
+| Sensors | **no concept whatsoever** | camera / lidar / IMU prims, render products |
+| Semantic labels | **no concept** | semantics schema applied for SDG — verify the exact schema name against your runtime, it has changed across releases |
+| Visual vs collision | `<visual>` and `<collision>` exist | verified preserved, `purpose` set correctly, collision meshes given approximations |
+| Collider approximation | none | convex hull / convex decomposition / SDF chosen per part |
+| Mass and inertia | `<inertial>` exists but is frequently zero or wrong in real files | validated, and corrected where wrong |
+| Units | meters/radians **by convention only** — nothing declares or enforces it | asserted and enforced at ingest |
+| Instancing, variants, LOD | no concept | authored |
+
+Being able to say this out loud, unprompted, is the deliverable of M2 — more than the import
+script is.
+
+---
+
+## 8. Decision log
+
+Each entry: the question, the decision, the reason, and **what it costs** — because a decision
+with no stated cost is usually one that wasn't actually made.
+
+### ADR-01 — Z-up, meters
+**Q:** USD defaults to Y-up. Which convention wins?
+**D:** Z-up, `metersPerUnit = 1.0`.
+**Why:** Omniverse, Isaac Sim and URDF are all Z-up. Following USD's default would mean a
+rotation fixup on every robot import and every Isaac hand-off — a permanent tax to match a
+default nobody downstream uses.
+**Cost:** Assets authored in Y-up DCC tools need conversion at ingest. That conversion is in
+one place and is validated, which is the trade being bought.
+
+### ADR-02 — Geometry is a payload, not a sublayer
+**D:** Geometry arrives via a payload arc on the asset-root prim.
+**Why:** Load-gating (cheap metadata queries) and a single-line vendor swap point. §3.
+**Cost:** Consumers must remember to load payloads before touching geometry, and a stale
+payload target fails at composition rather than at author time — so `no_unresolved_references`
+is a mandatory validator, not an optional one.
+
+### ADR-03 — Domain layers are the strongest sublayer
+**D:** `domain_electrical` > `physics` > `mtl`.
+**Why:** Most site-specific opinion wins over most generic. Site engineering data should
+outrank a simulation default.
+**Cost:** A domain author can silently override a physics value. Mitigated by keeping the
+domain namespace disjoint from the physics namespace in practice, and by the fact that a
+deliberate override is the intended behaviour when they do collide.
+
+### ADR-04 — The interface layer is the only public entry point
+**D:** Consumers reference `rack_gb300.usda`. Never `geo.usdc`, never `physics.usda`.
+**Why:** It is the seam that lets the internal layer structure change without breaking any
+consumer. Referencing a sublayer directly gets you an unlayered fragment and silently drops
+every opinion above it.
+**Cost:** One more file per component, and a rule that has to be enforced by convention and
+review rather than by USD itself.
+
+### ADR-05 — Load-independent data lives on the asset-root prim
+**D:** Domain metadata and mass on the root; colliders and bindings on descendants.
+**Why:** Makes the whole domain rule set runnable with geometry unloaded. §3.
+**Cost:** Per-sub-part domain data (per-tray power draw, say) does not get this property. If
+that is ever needed, those prims must move into the interface layer or the fast path is lost
+for them.
+
+### ADR-06 — Instancing chosen by addressability, not performance
+**D:** Scenegraph for anything an operator clicks; PointInstancer for anything they don't.
+**Why:** §5. A decision-layer twin whose racks cannot be selected has failed at its purpose,
+however fast it renders.
+**Cost:** Measurably higher memory and prim count at high `N`. M7 quantifies exactly how much,
+which turns an assertion into a number.
+
+### ADR-07 — `.usda` for reviewed layers, `.usdc` for geometry
+**D:** Interface, materials, physics, domain and scene layers are ASCII. Geometry is binary.
+**Why:** Layer files should be diffable in a pull request — that is most of the value of
+layering as a governance mechanism. Meshes should not be.
+**Cost:** Slightly slower parse for the ASCII layers. Irrelevant at these sizes, and it would
+matter if they held geometry — which is another argument for the split.
+
+### ADR-08 — Source immutable, published generated
+**D:** Nothing in `assets/source/` is ever edited. Nothing in `assets/published/` is ever
+hand-edited.
+**Why:** It is what makes "I re-run the pipeline" a true answer instead of an aspiration.
+**Cost:** Every fix must be expressed as code, including one-off ones. That is the discipline
+being bought, and it is genuinely slower on the first fix and much faster by the tenth.
+
+### ADR-09 — Domain data as namespaced custom attributes, not a schema (yet)
+**D:** `aifactory:electrical:nominalPowerDrawW` and friends, as custom attributes.
+**Why:** Zero registration, works in every USD build, reviewable in ASCII. The productionisation
+path is a codeless applied API schema, which changes the authoring call and nothing else.
+Real DSX partners (ETAP for electrical, Cadence for thermal) define these as formal specs;
+mirroring that structure is the point of the exercise.
+**Cost:** No type safety and no USD-level validation — a typo silently becomes a new attribute
+rather than an error. **This is precisely why `electrical_complete` and `thermal_complete`
+exist as validators.** The weakness of the choice creates the requirement for the gate.
+
+### ADR-10 — `session.usda` is strongest and gitignored
+**D:** Runtime telemetry is the strongest scene layer and is never committed.
+**Why:** Live values must override design intent for display, and must never be confused with
+design intent afterwards.
+**Cost:** A scene missing `session.usda` composes with a subLayer that does not resolve. The
+layer is authored as optional and its absence is treated as normal, not as an error — one of
+the few places the pipeline deliberately tolerates an unresolved path.
+
+---
+
+## 9. Known limitations
+
+- Domain rules encode **one worked example** of a spec. They are not an electrical or thermal
+  standard and are not endorsed by anyone.
+- `power_budget_consistent` is arithmetic, not load-flow. It cannot see phase imbalance,
+  inrush, derating or fault current.
+- No CFD. Thermal validation checks declarations for completeness and consistency, nothing more.
+- Instancing benchmarks reflect one GPU and one driver version. They are a reproducible method
+  first and numbers second.
+- The `ovrtx` / `ovphysx` / `ovstage` APIs are Early Access and may move. Anything stubbed
+  against a changed API is marked `# STUB:` in code and called out in `README.md` rather than
+  quietly left to look finished.

@@ -1,0 +1,21 @@
+# Runtime / local artifacts
+logs/
+captures/
+state/
+.venv/
+__pycache__/
+*.pyc
+.DS_Store
+
+# Ephemeral scene layer — runtime telemetry overrides, never committed.
+# See ARCHITECTURE.md §4: session.usda is the strongest layer and the only
+# one that is deliberately NOT under version control.
+assets/published/scenes/session.usda
+
+# Benchmark scratch output (BENCHMARKS.md holds the committed numbers)
+bench_out/
+
+# Large binary source drops that are fetched, not authored.
+# Anything under assets/source/ that we generate is committed; anything
+# downloaded from a vendor is not. Keep the manifest either way.
+assets/source/**/*.zip
