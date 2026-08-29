@@ -50,13 +50,14 @@ The geometry is representative, not vendor CAD — see [Simulated vs. approximat
 
 ## The layer architecture
 
-This is the part worth reading. Full rationale and the decision log live in
+This is the part worth reading. Full rationale, a glossary of the terms used precisely
+below (*component*, *interface layer*, *stage consumer*), and the decision log live in
 [ARCHITECTURE.md](ARCHITECTURE.md).
 
 ### Per component
 
 ```
-rack_gb300.usda                      ← INTERFACE LAYER — the only file consumers reference
+rack_gb300.usda                      ← INTERFACE LAYER — the only file the scene references
 │
 │  subLayers, listed strongest first:
 ├── domain_electrical.usda           ← site/electrical engineer owns   (strongest)
@@ -231,6 +232,17 @@ otherwise catch the project overclaiming.
 
 ## How to adapt this to your assets
 
+There are two ways in, and the second is probably the one you want.
+
+**Just validate a twin you already have** — the validator takes any USD stage and does not
+assume this repo produced it (ADR-11):
+
+```bash
+./ci/validate.sh /path/to/your/scene.usda
+```
+
+**Run your assets through the whole pipeline:**
+
 1. Drop your source geometry in `assets/source/` and leave it alone forever.
 2. Edit the conventions table above if your site disagrees — then change the `valid_units`
    validator to match, so the convention and its enforcement never drift apart.
@@ -245,4 +257,5 @@ otherwise catch the project overclaiming.
 ## Further reading
 
 - [ARCHITECTURE.md](ARCHITECTURE.md) — layer strategy, LIVRPS reasoning, decision log, URDF gap analysis
-- [docs/BUILD_GUIDE.md](docs/BUILD_GUIDE.md) — the build order, step by step
+- [docs/GETTING_STARTED.md](docs/GETTING_STARTED.md) — follow-along: commands, signatures, verification per step
+- [docs/BUILD_GUIDE.md](docs/BUILD_GUIDE.md) — why each step exists, the gotchas, and what it earns you

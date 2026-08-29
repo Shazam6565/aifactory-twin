@@ -7,6 +7,53 @@ written so that every ordering decision can be defended rather than merely state
 
 ---
 
+## Glossary — read this first
+
+These five words are used precisely throughout this document, and two of them are overloaded
+in ordinary USD conversation. Definitions here win.
+
+| Term | Meaning in this repo |
+|---|---|
+| **Component** | One reusable, self-contained asset: a rack, a CDU, a PDU, a floor tile, the robot. Matches USD's `kind = "component"` in the model hierarchy — a leaf-level thing you would ship and reuse. Lives in one directory under `assets/published/components/`. |
+| **Interface layer** | The single `.usda` file at the root of a component directory (`rack_gb300.usda`). It declares the asset-root prim, attaches geometry as a payload, and sublayers the material / physics / domain opinions. It is the component's public API. |
+| **Referencing layer** | Any layer that pulls a component in by reference — in this repo, the scene's `catalog.usda` and `layout.usda`. Also anyone else's scene, in another repo, that references our published output. |
+| **Stage consumer** | Software that opens a composed stage and does something with it: the validator, `usdview`, `ovrtx`, `ovphysx`, Isaac Sim, an MCP agent answering questions about the scene. Consumers **read**; the pipeline **writes**. |
+| **Producer** | The pipeline itself — everything in `src/aifactory_twin/` except `consume/`. The only thing that writes to `assets/published/`. |
+
+When this document says *"the only file a consumer names"*, it means both senses at once, and
+the rule is the same for both: **reference `rack_gb300.usda`, never `geo.usdc`, never
+`physics.usda`.** See ADR-04.
+
+### Where a component comes from
+
+```
+   assets/source/rack_gb300.usda          a vendor drop. Immutable. Possibly wrong.
+            │                             (in this repo, generated once by tools/ as a
+            │                              stand-in, since we have no real vendor CAD)
+            │
+            ▼  ingest/normalize.py            M1 — units, up-axis, naming, xform reset
+   normalized geometry + manifest.json        provenance: source sha256 → published path
+            │
+            ▼  author/simready.py             M3 — split into the layer stack, then author
+   assets/published/components/rack_gb300/         physics, materials, semantics, domains
+       rack_gb300.usda        ← interface layer
+       geo.usdc               ← payload
+       mtl.usda  physics.usda  domain_electrical.usda   ← sublayers
+            │
+            ▼  author/assemble.py             M4 — referenced N times, placed, instanced
+   assets/published/scenes/datahall.usda
+            │
+            ▼
+   stage consumers: validate/ · ovrtx · ovphysx · usdview · agents
+```
+
+**The component is the unit of reuse, of vendor ownership, and of validation.** Authoring work
+spent once on a component is paid back `N` times in the scene — which is the entire reason the
+pipeline is shaped as *component authoring* followed by *scene assembly*, rather than as one
+script that builds a data hall.
+
+---
+
 ## 1. The one-paragraph version
 
 A component is a stack of independently ownable opinions over a single piece of vendor
@@ -47,7 +94,7 @@ Within `subLayers`, **earlier in the list is stronger.**
 ## 3. Per-component layer stack
 
 ```
-rack_gb300.usda                    ← interface layer; the only file a consumer names
+rack_gb300.usda                    ← interface layer; the only file anything else names
   subLayers = [
       @./domain_electrical.usda@,  ← strongest sublayer
       @./physics.usda@,
@@ -134,6 +181,61 @@ datahall.usda
 |---|---|---|---|
 | `session.usda` | runtime / telemetry | live values: measured draw, temperatures, robot pose | ephemeral — **not committed** |
 | `site_overrides.usda` | site engineer | this deployment's deviations from catalog defaults | committed, per-site |
+### What the reference arc actually looks like
+
+"Scene → published components" is the **R** in LIVRPS, and on disk it is unremarkable — which
+is the point. `catalog.usda` answers *which version of each part this scene uses*:
+
+```usda
+#usda 1.0
+(
+    defaultPrim = "Catalog"
+)
+
+class "Catalog"
+{
+    class "RackGB300" (
+        prepend references = @../components/rack_gb300/rack_gb300.usda@
+    ) { }
+}
+```
+
+`layout.usda` answers *how many and where*, one prim per placed unit:
+
+```usda
+#usda 1.0
+
+over "World"
+{
+    def Xform "Row_B"
+    {
+        def "rack_B14" (
+            prepend references = @../components/rack_gb300/rack_gb300.usda@
+            instanceable = true
+        )
+        {
+            double3 xformOp:translate = (12.0, 4.8, 0.0)
+            uniform token[] xformOpOrder = ["xformOp:translate"]
+        }
+        # ... N of these, generated
+    }
+}
+```
+
+The reference pulls in the component's **entire composed opinion** — every sublayer and the
+payload — under `rack_B14`. The scene then adds only what it owns: a transform and an
+instancing flag.
+
+Note the reference targets `rack_gb300.usda` and nothing else. Referencing `geo.usdc` directly
+would also "work", in the sense that geometry would appear — with materials, colliders, mass,
+semantics and power ratings silently absent. It would look correct in a viewport and fail every
+validator, which is the failure mode ADR-04 exists to prevent.
+
+**Open decision for M4:** whether placed prims reference the component directly (shown above)
+or inherit from the `catalog.usda` class prims. The direct form is the standard idiom and is
+known to instance cleanly; the class form centralises version changes in one place. Decide it
+with a measurement at M4 rather than by assertion, and record which you chose here.
+
 | `layout.usda` | layout / planning | placement, rows, instancing, LOD variant selections | committed |
 | `catalog.usda` | asset pipeline | references to published components — the parts list | generated |
 
@@ -302,6 +404,19 @@ design intent afterwards.
 **Cost:** A scene missing `session.usda` composes with a subLayer that does not resolve. The
 layer is authored as optional and its absence is treated as normal, not as an error — one of
 the few places the pipeline deliberately tolerates an unresolved path.
+
+### ADR-11 — The validator accepts any USD stage, not just ours
+**Q:** Is validation a step in *this* pipeline, or a tool that works on anyone's twin?
+**D:** A tool. `validate/` takes a stage path and must not assume this repo's directory layout,
+naming, or that the pipeline produced the input.
+**Why:** The most likely external use of this repo is not "run my geometry through your
+pipeline" — it is "point your gate at the twin I already have." A validator coupled to its
+producer is a build step; a validator decoupled from it is a product. The decoupled version
+also happens to be the one that can validate a *competitor's* output, which is what makes it
+useful to a partner.
+**Cost:** Rules cannot assume our conventions hold. Anything convention-dependent — Z-up,
+`aifactory:` attribute namespace — has to be a configurable parameter with our values as the
+default, rather than a hardcoded constant. Slightly more code, and worth it.
 
 ---
 
