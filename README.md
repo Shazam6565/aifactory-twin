@@ -257,5 +257,4 @@ assume this repo produced it (ADR-11):
 ## Further reading
 
 - [ARCHITECTURE.md](ARCHITECTURE.md) — layer strategy, LIVRPS reasoning, decision log, URDF gap analysis
-- [docs/GETTING_STARTED.md](docs/GETTING_STARTED.md) — follow-along: commands, signatures, verification per step
-- [docs/BUILD_GUIDE.md](docs/BUILD_GUIDE.md) — why each step exists, the gotchas, and what it earns you
+- [docs/GETTING_STARTED.md](docs/GETTING_STARTED.md) — build it yourself: commands, signatures and a verification per step

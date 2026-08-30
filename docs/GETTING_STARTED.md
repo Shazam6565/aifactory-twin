@@ -1,15 +1,11 @@
 # Getting started — follow along, steps 1 to 10
 
-The companion to [`BUILD_GUIDE.md`](BUILD_GUIDE.md). That document explains **why** each step
-exists and what it earns you. This one is what you keep open at the keyboard: exact commands,
-the files to create, the signatures to fill in, and a verification you can run before moving on.
+Build the pipeline yourself, in ten steps covering M1, M3 and M5. Exact commands, the files to
+create, the signatures to fill in, and a verification you can run before moving on.
 
 **Function bodies are deliberately left to you.** Signatures and docstrings are given so you
 never have to guess the shape; the logic inside is the part that becomes the thing you can talk
 about. If you paste your way through this, the project has failed at its only real purpose.
-
-Read the matching section of `BUILD_GUIDE.md` before starting each step — the gotchas there are
-the ones that will actually cost you an hour.
 
 ---
 
@@ -495,5 +491,5 @@ a test asserting it fails, so the failure path stays tested rather than tested o
 
 ## Done
 
-M1, M3 and M5 complete. `BUILD_GUIDE.md` has the ordering for what comes next — M4 assembly and
-instancing first, because validation now exists to catch your mistakes at scale.
+M1, M3 and M5 complete. M4 — assembly and both instancing strategies — comes next, because
+validation now exists to catch your mistakes at scale.
