@@ -19,3 +19,7 @@ bench_out/
 # Anything under assets/source/ that we generate is committed; anything
 # downloaded from a vendor is not. Keep the manifest either way.
 assets/source/**/*.zip
+
+# Personal interview prep. Deliberately NOT part of the public repo — a document
+# about how to talk about the project doesn't belong in the project.
+prep/
