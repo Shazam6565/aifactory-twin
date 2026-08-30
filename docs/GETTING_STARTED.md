@@ -11,8 +11,8 @@ about. If you paste your way through this, the project has failed at its only re
 
 ## Progress
 
-- [ ] 1 · Environment
-- [ ] 2 · Repo skeleton
+- [x] 1 · Environment
+- [x] 2 · Repo skeleton
 - [ ] 3 · `SIMREADY_SPEC.md`
 - [ ] 4 · Source assets
 - [ ] 5 · Ingest + normalize · **M1**
@@ -58,14 +58,35 @@ for mod in ("UsdSemantics", "PhysxSchema"):
 PY
 ```
 
-`PhysxSchema: NOT available` is **expected and correct** on `usd-core` — it is an NVIDIA
-extension, not core USD. Note which semantics module you have; step 8 depends on it.
+What this printed on `usd-core` 26.8, and what each result means:
 
-Then read `help(UsdUtils.ComplianceChecker)` and note its real signature. You call it at step 10.
+| Result | Meaning |
+|---|---|
+| `PhysxSchema: NOT available` | **Expected.** NVIDIA extension, not core USD. Core `UsdPhysics` is all steps 7 and 10 need. |
+| `UsdSemantics: available` | Use `UsdSemantics.LabelsAPI` at step 8. The older Omniverse `Semantics` extension is not needed. |
+| `ComplianceChecker: False` | **`usd-core` does not ship it.** It has been superseded — see below. |
+
+`UsdUtils.ComplianceChecker` is gone, and `usd-core` ships no `usdchecker` binary either. The
+replacement is OpenUSD's `UsdValidation` framework, which *is* present and is better for our
+purposes — check it and see what you get for free:
+
+```bash
+uv run python -c "
+from pxr import UsdValidation
+md = UsdValidation.ValidationRegistry().GetAllValidatorMetadata()
+print(len(md), 'validators registered')
+for m in sorted(md, key=lambda x: x.name): print(' ', m.name)
+"
+```
+
+Twenty-eight built-in validators, several of which are rules you were going to write by hand —
+`usdUtilsValidators:MissingReferenceValidator`, `usdPhysicsValidators:RigidBodyChecker`,
+`usdShadeValidators:MaterialBindingApiAppliedValidator`. Step 10 builds on this registry rather
+than on a bespoke rule runner. Full reasoning in `NOTES.md`.
 
 - [ ] all core modules import
 - [ ] USD version pinned in `pyproject.toml` and written in `NOTES.md`
-- [ ] semantics module identified
+- [ ] `UsdValidation` registry enumerated, built-ins noted
 
 ---
 
@@ -353,7 +374,8 @@ def author_materials(stage, layer_path: str, asset_root: str) -> None:
     Edit-target into mtl.usda, same pattern as step 7."""
 
 def author_semantics(stage, layer_path: str, asset_root: str, class_label: str) -> None:
-    """Apply the semantics schema identified in step 1 to the asset root.
+    """Apply UsdSemantics.LabelsAPI to the asset root (confirmed available at step 1).
+    Read back with UsdSemantics.LabelsQuery.
     Without labels there is no SDG ground truth and the sensor story is empty."""
 ```
 
@@ -426,31 +448,44 @@ return on the payload decision, and a number is worth a paragraph of explanation
 
 ## Step 10 · Validation + the gate ⭐ — **M5**
 
-`src/aifactory_twin/validate/rules.py` — keep the interface small enough that a domain expert
-who is not a USD expert could add a rule:
+> **Plan changed at step 1.** `UsdUtils.ComplianceChecker` does not exist in `usd-core` 26.8.
+> OpenUSD's `UsdValidation` framework replaced it and ships **28 built-in validators**. Build on
+> that registry instead of writing a bespoke rule runner — your domain rules then run alongside
+> the built-ins and report through one error type. See `NOTES.md`.
+
+**First, find out what you get for free.** Run the built-ins over a component and see which of
+your `SIMREADY_SPEC.md` rules are already covered — `MissingReferenceValidator`,
+`RigidBodyChecker`, `ColliderChecker`, `MaterialBindingApiAppliedValidator`,
+`StageMetadataChecker`, `AttributeTypeMismatch`. Write your own only for what is left.
+
+`src/aifactory_twin/validate/rules.py` — register domain validators into the registry:
 
 ```python
-@dataclass
-class Failure:
-    rule_id: str
-    prim_path: str
-    message: str      # say what to DO, not just what is wrong
-    severity: str     # "error" | "warning"
+from pxr import UsdValidation
 
-class Rule:
-    id: str
-    needs_payload: bool          # from the SIMREADY_SPEC.md column
-    def check(self, stage) -> list[Failure]: ...
+def _check_electrical_complete(prim) -> list[UsdValidation.ValidationError]:
+    """Powered equipment declares nominalPowerDrawW and phase on its asset root.
+
+    Return a ValidationError per offending prim, with an ErrorSite naming it and a
+    message that says what to DO, not just what is wrong.
+    """
+
+def register_all(registry: UsdValidation.ValidationRegistry) -> None:
+    """Register the aifactory validators. Use RegisterPrimValidator for per-prim
+    rules and RegisterStageValidator for whole-stage ones like power_budget_consistent."""
 ```
 
-Implement six first, spanning the categories rather than the easy ones: `valid_units`,
-`no_default_prim_missing`, `rigidbody_has_mass`, `all_meshes_bound`, `semantics_present`,
-`electrical_complete`. Then `power_budget_consistent` — partial at component scope, completed
-at M4.
+Write four to start — the ones no built-in covers: `semantics_present`, `electrical_complete`,
+`thermal_complete`, and `power_budget_consistent` (partial at component scope, completed at M4).
 
-`validate/runner.py` runs `UsdUtils.ComplianceChecker` for structure, then the rules — **in two
-passes**: `needs_payload=False` rules against a `LoadNone` stage, the rest against a loaded one.
+`validate/runner.py` drives a `UsdValidation.ValidationContext` and runs **two passes**:
+domain rules against a `LoadNone` stage, everything needing geometry against a loaded one.
 Report both timings.
+
+**Verify first that `ValidationContext` will run against a `LoadNone` stage** — the fast domain
+gate in `ARCHITECTURE.md` §3 depends on it. If it will not, run the domain validators directly
+against the unloaded stage and reserve the context for the full pass. Either way, find out
+before building on the assumption.
 
 Per ADR-11, the runner takes **any** stage path and must not assume this repo's layout.
 Convention-dependent values (up-axis, the `aifactory:` namespace) are parameters with our
@@ -481,7 +516,7 @@ cp -R assets/published/components/rack_gb300 tests/fixtures/rack_no_mass
 Second run must exit non-zero and name the prim and the rule ID. Commit the broken fixture and
 a test asserting it fails, so the failure path stays tested rather than tested once.
 
-- [ ] six rules implemented and passing on good assets
+- [ ] built-ins enumerated; domain validators written only for what they miss
 - [ ] fast (unloaded) and full (loaded) passes, both timed
 - [ ] runner works on a stage from outside this repo
 - [ ] broken fixtures committed, gate proven to fail legibly

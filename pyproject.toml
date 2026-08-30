@@ -1,0 +1,23 @@
+[project]
+name = "aifactory-twin"
+version = "0.1.0"
+description = "A SimReady OpenUSD asset pipeline and validation harness for AI factory digital twins"
+readme = "README.md"
+authors = [
+    { name = "Shaurya Tiwari", email = "vaasutiwari@gmail.com" }
+]
+requires-python = ">=3.12"
+dependencies = [
+    "numpy>=2.5.2",
+    "usd-core==26.8",  # pinned: M7 benchmarks must be reproducible
+]
+
+
+[build-system]
+requires = ["uv_build>=0.9.1,<0.10.0"]
+build-backend = "uv_build"
+
+[dependency-groups]
+dev = [
+    "pytest>=9.1.1",
+]
