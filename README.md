@@ -21,25 +21,27 @@ The interesting claim is not that it renders. It is that:
 
 1. **Four owners edit one scene without merge conflicts**, because ownership is encoded in the
    layer stack instead of in a process document nobody reads.
-2. **The scene answers engineering questions without loading geometry.** Total power draw of
-   row B is computable with all 4M triangles still on disk, because domain metadata lives above
-   the payload arc rather than inside it.
-3. **CI catches design errors, not just malformed files.** If the racks in a row draw more
-   power than their PDU can supply, `ci/validate.sh` exits non-zero and names the prim.
+2. **The scene's declared engineering data is readable without loading geometry.** Every rack's
+   declared power draw can be read with all 4M triangles still on disk, because domain metadata
+   lives above the payload arc rather than inside it.
+3. **CI gates on consumer fitness, not just file validity.** A rigid body with no mass, a
+   material binding that resolves to nothing, a collision mesh left at full resolution —
+   `usdchecker` passes all three and `ovphysx` and `ovrtx` do not. `ci/validate.sh` exits
+   non-zero and names the prim.
 
-Point 3 is the whole thesis. A twin that only checks file validity is a viewer. A twin that
-checks *design* validity is a decision layer, and that is the difference between a graphics
-asset and an engineering artifact.
+Point 3 is the thesis. **Valid USD and usable-by-`ovphysx` are different claims. `usdchecker`
+makes the first. This harness makes the second.**
 
 ## What this is not
 
 Scoping honestly is itself the signal, so:
 
-- **Not CFD.** There is no fluid solve. Thermal data is *declared* per component and checked
-  for consistency. It is a spec conformance check, not a simulation.
-- **Not electrical solving.** No load-flow, no fault current, no harmonics. `power_budget_consistent`
-  sums declared draw against declared capacity. That is arithmetic on a scene graph, and it is
-  deliberately all it claims to be.
+- **Not CFD.** There is no fluid solve. Thermal data is *declared* per component; the harness
+  checks it was authored, not that it is right.
+- **Not electrical solving.** No load-flow, no fault current, no harmonics.
+- **No cross-component engineering consistency.** Nothing compares declared values across prims
+  or aggregates them. That tier is designed and specified, and deliberately not built — see
+  `SIMREADY_SPEC.md` §6.
 - **Not photoreal.** Materials are correct and bound, not art-directed.
 - **Not gigawatt scale.** `N` tops out at a few thousand racks on one workstation.
 - **Not a product.** No UI, no persistence layer, no auth.
@@ -97,8 +99,8 @@ datahall.usda
 └── sublayer: catalog.usda           ← references published components (weakest)
 ```
 
-Four owners, four layers, no merge conflicts. That is the entire pitch for OpenUSD as a
-decision layer, demonstrated rather than asserted.
+Four owners, four layers, no merge conflicts. That is the entire pitch for OpenUSD as a shared
+source of truth across disciplines, demonstrated rather than asserted.
 
 ---
 
@@ -198,6 +200,7 @@ cost-awareness argument, and it is the honest reason for the split.
 ## Status
 
 Guarded table. **A row flips to ✅ only when the milestone genuinely runs.**
+`📐 designed` means specified and deliberately not built — it is not pending work.
 
 | Milestone | What it delivers | Status |
 |---|---|---|
@@ -206,10 +209,11 @@ Guarded table. **A row flips to ✅ only when the milestone genuinely runs.**
 | M2 | URDF interop — import, then author what URDF cannot express | ⬜ not started |
 | M3 | SimReady authoring — physics, materials, semantics, domain layers | ⬜ not started |
 | M4 | Assembly + both instancing strategies at N = 64 / 512 / 4096 | ⬜ not started |
-| M5 | Validation harness + CI gate | ⬜ not started |
+| M5 | Validation harness + CI gate — Tier 1 structural, Tier 2 consumer fitness | ⬜ not started |
 | M6 | Two consumers (ovrtx, ovphysx) over one stage at independent rates | ⬜ not started |
 | M7 | Reproducible benchmarks | ⬜ not started |
 | M8 | Packaged reference architecture | ⬜ not started |
+| — | Tier 3 engineering consistency — cross-prim comparison, aggregation | 📐 designed, not built |
 
 ---
 
@@ -220,9 +224,9 @@ otherwise catch the project overclaiming.
 
 | Claim | Reality |
 |---|---|
-| Rack / CDU / PDU geometry | **Procedurally generated** to representative dimensions and mass. Not vendor CAD. Dimensions and power figures are drawn from public spec sheets and are approximate. |
-| Thermal data | **Declared, not solved.** No CFD anywhere in this repo. Validators check declarations are complete and self-consistent. |
-| Electrical data | **Declared, not solved.** `power_budget_consistent` is a summation against declared capacity, not a load-flow study. |
+| Rack / CDU / PDU geometry | **Procedurally generated** to representative dimensions and mass. Not vendor CAD. Every dimension and power figure is chosen as representative, not sourced from a vendor spec sheet — see `SIMREADY_SPEC.md` §7. |
+| Thermal data | **Declared, not solved.** No CFD anywhere in this repo. Validators check the data was **authored**, not that it is correct. |
+| Electrical data | **Declared, not solved.** Presence and token validity only. **No rule compares declared values across prims or aggregates them.** |
 | Power / heat figures | Order-of-magnitude representative of a liquid-cooled AI rack. Not measured. |
 | Robot | Real URDF (NVIDIA Carter), really imported, with post-import authoring done by this pipeline. |
 | Benchmarks | Real measurements on stated hardware, or absent. Never estimated. |

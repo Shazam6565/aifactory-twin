@@ -154,7 +154,7 @@ The practical payoff:
 |---|---|---|
 | Total power draw of row B | unloaded | kilobytes |
 | Every rack declares phase and cooling type | unloaded | kilobytes |
-| Sum of rack draw ≤ PDU capacity | unloaded | kilobytes |
+| Read declared draw for every rack in the hall | unloaded | kilobytes |
 | Every mesh has a bound material | **loaded** | full |
 | No mesh collider above 10k tris | **loaded** | full |
 
@@ -296,6 +296,28 @@ prim naming is derived from source rather than from iteration order.
 
 ---
 
+## Validation tiers
+
+**Valid USD and usable-by-`ovphysx` are different claims. `usdchecker` makes the first. This
+harness makes the second.**
+
+| Tier | Question | Owner | Status |
+|---|---|---|---|
+| **Tier 1 — Structural validity** | Is this valid USD? | The 28 built-in `UsdValidation` validators shipped with OpenUSD | delegated; we run the suite and report it |
+| **Tier 2 — Consumer fitness** | Is this asset usable by `ovphysx` (mass, colliders) and by `ovrtx` (resolved material bindings)? | Us | **this is the harness** |
+| **Tier 3 — Engineering consistency** | Are the declared engineering values consistent with each other? | — | **designed, not built** |
+
+Tier 2 is what the project is for. A structurally valid asset can still be unusable: a rigid
+body with no mass, a material binding that resolves to nothing, a collision mesh at full
+resolution. `usdchecker` passes all three. `ovphysx` and `ovrtx` do not.
+
+Tier 3 rules were specified and cut from the build. The domain data they would read **is**
+authored and its presence is validated — see §9 and `SIMREADY_SPEC.md` §6.
+
+Rules, severities and payload flags: `SIMREADY_SPEC.md`.
+
+---
+
 ## 7. URDF gap analysis
 
 URDF describes a robot's kinematics and little else. Importing it to USD is the easy half;
@@ -423,10 +445,16 @@ default, rather than a hardcoded constant. Slightly more code, and worth it.
 ## 9. Known limitations
 
 - Domain rules encode **one worked example** of a spec. They are not an electrical or thermal
-  standard and are not endorsed by anyone.
-- `power_budget_consistent` is arithmetic, not load-flow. It cannot see phase imbalance,
-  inrush, derating or fault current.
-- No CFD. Thermal validation checks declarations for completeness and consistency, nothing more.
+  standard, are not endorsed by anyone, and check only that data was authored.
+- **Cross-component engineering consistency checking is designed and specified but not
+  implemented.** The domain data is authored and its presence is validated; **no rule compares
+  declared values across prims, and nothing aggregates them.** The layer architecture was built
+  to make such rules possible — domain data sits on the asset root and is readable with geometry
+  unloaded — but that capability is unused. See `SIMREADY_SPEC.md` §6.
+- Domain rules encode presence, not correctness. A rack declaring an implausible power draw
+  passes every rule in this repository provided the attribute exists and is in range.
+- No CFD. Thermal validation checks a declaration is present and its token is valid. It does
+  not check the value, and does not compare it against anything.
 - Instancing benchmarks reflect one GPU and one driver version. They are a reproducible method
   first and numbers second.
 - The `ovrtx` / `ovphysx` / `ovstage` APIs are Early Access and may move. Anything stubbed

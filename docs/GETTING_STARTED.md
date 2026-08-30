@@ -121,29 +121,39 @@ git add -A && git commit -m "Step 2: repo skeleton"
 
 ## Step 3 · `SIMREADY_SPEC.md`
 
-No code. Create `SIMREADY_SPEC.md` with one table, and fill every row before writing any
-validator.
+No code. Every rule goes in `SIMREADY_SPEC.md` before any validator is written.
 
-| ID | Rule | Rationale — what breaks downstream | Severity | Payload needed |
+Rules sit in one of three tiers, and the tier says what the rule claims:
+
+| Tier | Question | Owner |
+|---|---|---|
+| 1 — Structural validity | Is this valid USD? | delegated to the 28 built-ins |
+| 2 — Consumer fitness | Is this usable by `ovphysx` and `ovrtx`? | **us — this is the harness** |
+| 3 — Engineering consistency | Are declared values consistent with each other? | **designed, not built** |
+
+Every Tier 2 rule names the consumer it protects. **If a rule protects no consumer, it is not a
+Tier 2 rule — do not add it.**
+
+| ID | Rule | Protects | Sev | Payload |
 |---|---|---|---|---|
-| SR-STRUCT-001 | `metersPerUnit == 1.0` and `upAxis == Z` | Mixed units silently corrupt every physics and electrical figure | error | no |
-| SR-PHYS-001 | Any `RigidBodyAPI` prim has mass > 0 | Zero-mass rigid bodies explode or fall through the floor in PhysX | error | no |
-| SR-DOMAIN-001 | Powered equipment declares draw and phase | Power budget cannot be computed; the twin cannot answer its main question | error | no |
+| SR-PHYS-001 | Any `RigidBodyAPI` prim has mass > 0 | `ovphysx`: zero-mass bodies are undefined in PhysX | error | no |
+| SR-RENDER-001 | Every renderable mesh resolves to a bound material | `ovrtx`: unresolved bindings render as default surface, silently | error | yes |
+| SR-ELEC-001 | Powered equipment declares draw and phase, non-null | electrical layer consumers: presence only, no value comparison | error | no |
 | … | | | | |
 
 Then a second section fixing the **numbers**, each with its provenance:
 
 | Quantity | Value | Where it came from |
 |---|---|---|
-| Rack nominal draw | | public spec sheet / chosen as representative |
-| PDU capacity | | |
+| Rack nominal draw | | chosen as representative |
 | Rack heat output | | |
+| Rack mass | | |
 | Mesh-collider triangle threshold | | |
 
-The *Payload needed* column is the one that matters most — it is what splits the fast domain
-gate from the full structural gate at step 10.
+The *Payload* column is the one that matters most — it is what splits the fast pass from the
+full pass at step 10.
 
-- [ ] every rule has an ID, a rationale, a severity and a payload flag
+- [ ] every rule has an ID, a tier, a protected consumer, a severity and a payload flag
 - [ ] every number has a stated source, including "chosen as representative"
 
 ---
@@ -471,12 +481,14 @@ def _check_electrical_complete(prim) -> list[UsdValidation.ValidationError]:
     """
 
 def register_all(registry: UsdValidation.ValidationRegistry) -> None:
-    """Register the aifactory validators. Use RegisterPrimValidator for per-prim
-    rules and RegisterStageValidator for whole-stage ones like power_budget_consistent."""
+    """Register the aifactory validators. Every rule here is per-prim —
+    use RegisterPrimValidator. Nothing in this harness aggregates across prims."""
 ```
 
 Write four to start — the ones no built-in covers: `semantics_present`, `electrical_complete`,
-`thermal_complete`, and `power_budget_consistent` (partial at component scope, completed at M4).
+`thermal_complete`, and `rigidbody_has_mass`. The domain pair are **presence checks only**: the
+attribute exists and is non-null. They must not compare values across prims or aggregate
+anything — that is Tier 3, and it is not built.
 
 `validate/runner.py` drives a `UsdValidation.ValidationContext` and runs **two passes**:
 domain rules against a `LoadNone` stage, everything needing geometry against a loaded one.
