@@ -67,7 +67,7 @@ If a rule is marked `no`, it must genuinely work unloaded. Verify it, do not ass
 
 ## 5. The rules
 
-`SCOPE.md` is the contract. It names **five** custom validators. Everything else here is
+`SCOPE.md` is the contract. It names **six** custom validators. Everything else here is
 delegated to the built-ins or is not built.
 
 ### Tier 1 — Structural validity
@@ -98,7 +98,7 @@ it returns.
 
 ### Tier 2 — Consumer fitness
 
-**Is this asset usable by `ovphysx` and by `ovrtx`?** These are the five custom validators from
+**Is this asset usable by `ovphysx` and by `ovrtx`?** These are the six custom validators from
 `SCOPE.md`, registered into `UsdValidation.ValidationRegistry` so they report through the same
 `ValidationError` type as the built-ins.
 
@@ -111,16 +111,15 @@ it returns.
 | SR-RENDER-001 | `all_meshes_bound` | `ovrtx` — a binding that exists but does not resolve is silent; `ComputeBoundMaterial()` returns invalid and the mesh renders as default surface | Every renderable mesh has a resolved material binding | error | yes |
 | SR-SDG-001 | `semantics_present` | SDG consumers — without labels, rendered images have no ground truth and cannot produce training data | Every asset-root prim carries a `UsdSemantics` label | error | no |
 | SR-ELEC-001 | `electrical_complete` | domain consumers — ADR-09 chose untyped custom attributes, where a typo becomes a new attribute rather than an error | Powered equipment declares power draw and phase. **Presence only:** the attribute exists and is non-null | error | no |
+| SR-THERM-001 | `thermal_complete` | domain consumers — as `electrical_complete`, for the second domain | Heat-generating equipment declares heat output and cooling type. **Presence only**, no cross-prim comparison | error | no |
 
-#### ⚠ Unresolved: `thermal_complete`
-
-| ID | Rule | Protects | Checks | Sev | Payload |
-|---|---|---|---|---|---|
-| SR-THERM-001 | `thermal_complete` | domain consumers — as `electrical_complete`, for the second domain | Heat-generating equipment declares heat output and cooling type. **Presence only** | error | no |
-
-**`SCOPE.md` lists five custom validators and this is not one of them.** It is retained here on
-an explicit instruction to keep it as a presence check. Either add it to `SCOPE.md` as a sixth,
-or delete it here. Do not leave the two documents disagreeing.
+```
+# TODO: verify against usdPhysicsValidators before implementing
+#   SR-PHYS-001 rigidbody_has_mass      vs usdPhysicsValidators:RigidBodyChecker
+#   SR-PHYS-002 rigidbody_has_collider  vs usdPhysicsValidators:ColliderChecker
+# Both built-ins already ship. If either fully covers our rule, delete ours rather
+# than duplicating it. Run both against a known-bad asset to settle it.
+```
 
 ### Tier 3 — Engineering consistency
 
@@ -155,7 +154,7 @@ See §7.
 ### Thresholds
 
 No thresholds remain. Every rule that needed one — collider triangle count, texture memory
-budget, power-draw sanity range — was cut with Tier 3 or is not among the five.
+budget, power-draw sanity range — was cut with Tier 3 or is not among the six.
 
 ### Allowed token sets
 

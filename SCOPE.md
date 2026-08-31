@@ -24,13 +24,13 @@ facility should be built. It is a **SimReady asset pipeline with a validation ga
 |---|---|---|
 | 1 | One layered component (`rack_gb300`) — interface layer, geometry payload, physics / material / domain sublayers | Each sublayer file contains only its own opinions when opened in a text editor |
 | 2 | Unloaded-stage domain query | A script opens the stage with `Usd.Stage.LoadNone` and prints power draw plus a composed prim count, with no geometry loaded |
-| 3 | Five custom validators registered into `UsdValidation.ValidationRegistry` | They run alongside the 28 built-in validators and report through the same `ValidationError` type |
+| 3 | Six custom validators registered into `UsdValidation.ValidationRegistry` | They run alongside the 28 built-in validators and report through the same `ValidationError` type |
 | 4 | `datahall.usda` — N racks via scenegraph instancing, floor tiles via `UsdGeomPointInstancer` | N is a CLI parameter; the gate passes at N = 64, 512, 4096 |
 | 5 | `ci/validate.sh` and a deliberately broken fixture | Running the gate against `tests/broken/` exits nonzero and names the offending prim |
 
-### The five custom validators
+### The six custom validators
 
-All five are **consumer-fitness** checks. None of them compare values across prims.
+All six are **consumer-fitness** checks. None of them compare values across prims.
 
 | Rule | Protects | Checks |
 |---|---|---|
@@ -39,6 +39,7 @@ All five are **consumer-fitness** checks. None of them compare values across pri
 | `all_meshes_bound` | `ovrtx` | Every renderable mesh has a resolved material binding |
 | `semantics_present` | SDG consumers | Every asset-root prim carries a `UsdSemantics` label |
 | `electrical_complete` | domain consumers | Powered equipment declares power draw and phase (**presence only**) |
+| `thermal_complete` | domain consumers | Heat-generating equipment declares heat output and cooling type (**presence only**, no cross-prim comparison) |
 
 ---
 
@@ -54,7 +55,7 @@ Stated up front rather than discovered later.
   values are declared attributes, not solved fields.
 - **Real geometry.** Components use dimensionally-plausible proxy boxes. The pipeline is
   the artifact; the geometry is a placeholder.
-- **LOD variant sets.** Designed in `ARCHITECTURE.md`, not built.
+- **LOD variant sets — not built.**
 - **`ovstorage`, `ovstream`, MCP/agent query tooling.** Out of scope entirely.
 - **URDF import.** Not covered by this repo.
 - **Production scale.** Demonstrated to N = 4096 on one machine. The architecture is the
@@ -90,9 +91,9 @@ coherent and still explainable.
 
 1. **Vertical slice.** One cube → `geo.usdc`. Interface layer with payload and three
    sublayers. Author mass, collider, material binding, semantics and the `aifactory:`
-   attributes — domain attributes on the **asset-root prim** (see ADR-003).
+   attributes — domain attributes on the **asset-root prim** (see ADR-05).
    *Ends with:* the unloaded-stage query printing a power value and a prim count.
-2. **The gate.** Five validators registered. `ci/validate.sh`. Broken fixture under
+2. **The gate.** Six validators registered. `ci/validate.sh`. Broken fixture under
    `tests/broken/`.
    *Ends with:* a red exit code naming the prim.
 3. **The hall.** `assemble.py`, N as a CLI flag, `SetInstanceable(True)` on rack

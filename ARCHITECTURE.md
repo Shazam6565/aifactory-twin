@@ -304,14 +304,14 @@ harness makes the second.**
 | Tier | Question | Owner | Status |
 |---|---|---|---|
 | **Tier 1 — Structural validity** | Is this valid USD? | The 28 built-in `UsdValidation` validators shipped with OpenUSD | delegated; we run the suite and report it |
-| **Tier 2 — Consumer fitness** | Is this asset usable by `ovphysx` and by `ovrtx`? | Us — five custom validators | **this is the harness** |
+| **Tier 2 — Consumer fitness** | Is this asset usable by `ovphysx` and by `ovrtx`? | Us — six custom validators | **this is the harness** |
 | **Tier 3 — Engineering consistency** | Are the declared engineering values consistent with each other? | — | **designed, not built** |
 
 A structurally valid asset can still be unusable. A rigid body with no mass, a material binding
 that resolves to nothing, a `RigidBodyAPI` prim with no collider — `usdchecker` passes all
 three; `ovphysx` and `ovrtx` do not. That gap is the harness.
 
-The five Tier 2 rules, each registered into `UsdValidation.ValidationRegistry` and each per-prim:
+The six Tier 2 rules, each registered into `UsdValidation.ValidationRegistry` and each per-prim:
 
 | Rule | Protects |
 |---|---|
@@ -320,6 +320,7 @@ The five Tier 2 rules, each registered into `UsdValidation.ValidationRegistry` a
 | `all_meshes_bound` | `ovrtx` |
 | `semantics_present` | SDG consumers |
 | `electrical_complete` | domain consumers — **presence only** |
+| `thermal_complete` | domain consumers — **presence only** |
 
 Tier 3 is specified and cut from the build. The domain data it would read **is** authored and
 its presence validated — see §9 and `SIMREADY_SPEC.md` §5.

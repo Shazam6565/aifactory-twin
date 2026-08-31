@@ -485,10 +485,15 @@ def register_all(registry: UsdValidation.ValidationRegistry) -> None:
     use RegisterPrimValidator. Nothing in this harness aggregates across prims."""
 ```
 
-Write four to start — the ones no built-in covers: `semantics_present`, `electrical_complete`,
-`thermal_complete`, and `rigidbody_has_mass`. The domain pair are **presence checks only**: the
-attribute exists and is non-null. They must not compare values across prims or aggregate
-anything — that is Tier 3, and it is not built.
+Write the six from `SCOPE.md`: `rigidbody_has_mass`, `rigidbody_has_collider`,
+`all_meshes_bound`, `semantics_present`, `electrical_complete`, `thermal_complete`.
+
+The domain pair are **presence checks only**: the attribute exists and is non-null. They must
+not compare values across prims or aggregate anything — that is Tier 3, and it is not built.
+
+**Settle the two physics rules before writing them.** `usdPhysicsValidators:RigidBodyChecker`
+and `:ColliderChecker` already ship. Run both against a known-bad asset first; if either fully
+covers our rule, delete ours rather than duplicating it. See the TODO in `SIMREADY_SPEC.md` §5.
 
 `validate/runner.py` drives a `UsdValidation.ValidationContext` and runs **two passes**:
 domain rules against a `LoadNone` stage, everything needing geometry against a loaded one.

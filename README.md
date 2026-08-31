@@ -117,7 +117,7 @@ aifactory-twin/
 ├── SCOPE.md                     # THE CONTRACT — what this repo does and does not claim
 ├── README.md                    # this file — the reference architecture
 ├── ARCHITECTURE.md              # layer strategy, composition decisions, decision log
-├── SIMREADY_SPEC.md             # the three validation tiers and the five custom rules
+├── SIMREADY_SPEC.md             # the three validation tiers and the six custom rules
 ├── BENCHMARKS.md                # CPU-only method stated; numbers unpopulated
 ├── docs/GETTING_STARTED.md      # step-by-step build order
 │
@@ -214,7 +214,7 @@ work.
 |---|---|---|---|
 | 1 | One layered component (`rack_gb300`) — interface layer, geometry payload, physics / material / domain sublayers | Each sublayer contains only its own opinions when opened in a text editor | ⬜ not started |
 | 2 | Unloaded-stage domain query | A script opens with `Usd.Stage.LoadNone` and prints power draw plus a composed prim count, no geometry loaded | ⬜ not started |
-| 3 | Five custom validators in `UsdValidation.ValidationRegistry` | They run alongside the 28 built-ins and report through the same `ValidationError` type | ⬜ not started |
+| 3 | Six custom validators in `UsdValidation.ValidationRegistry` | They run alongside the 28 built-ins and report through the same `ValidationError` type | ⬜ not started |
 | 4 | `datahall.usda` — N racks scenegraph-instanced, floor tiles via `UsdGeomPointInstancer` | N is a CLI parameter; the gate passes at N = 64, 512, 4096 | ⬜ not started |
 | 5 | `ci/validate.sh` and a deliberately broken fixture | Running the gate against `tests/broken/` exits nonzero and names the offending prim | ⬜ not started |
 | — | Tier 3 engineering consistency — cross-prim comparison, aggregation | — | 📐 designed, not built |
@@ -270,6 +270,6 @@ assume this repo produced it (ADR-11):
 
 - [SCOPE.md](SCOPE.md) — **the contract.** What this repo claims, and what it does not
 - [ARCHITECTURE.md](ARCHITECTURE.md) — layer strategy, LIVRPS reasoning, validation tiers, decision log
-- [SIMREADY_SPEC.md](SIMREADY_SPEC.md) — the three tiers and the five custom validators
+- [SIMREADY_SPEC.md](SIMREADY_SPEC.md) — the three tiers and the six custom validators
 - [BENCHMARKS.md](BENCHMARKS.md) — CPU-only benchmark method
 - [docs/GETTING_STARTED.md](docs/GETTING_STARTED.md) — build it yourself: commands, signatures and a verification per step
