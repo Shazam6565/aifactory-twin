@@ -3,7 +3,7 @@
 Layout:
     ingest/    source -> normalized USD (units, naming, xforms, provenance)
     author/    layer authoring (simready, domain layers, scene assembly)
-    optimize/  instancing strategies, LOD variant sets
+    optimize/  instancing strategies
     validate/  usd validation + custom SimReady rules -> report
     consume/   ovrtx render, ovphysx physics  (Linux + NVIDIA GPU only)
 """

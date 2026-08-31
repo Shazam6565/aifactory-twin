@@ -72,7 +72,7 @@ USD resolves conflicting opinions by **LIVRPS** strength order, strongest first:
 |---|---|---|
 | **L** | Local — the layer stack: a layer plus its `subLayers`, recursively | material, physics and domain opinions |
 | **I** | Inherits | — |
-| **V** | VariantSets | LOD switching (M4) |
+| **V** | VariantSets | — (LOD switching was designed, not built) |
 | **R** | References | scene → published components |
 | **P** | Payloads | component → geometry |
 | **S** | Specializes | — |
@@ -236,7 +236,7 @@ or inherit from the `catalog.usda` class prims. The direct form is the standard 
 known to instance cleanly; the class form centralises version changes in one place. Decide it
 with a measurement at M4 rather than by assertion, and record which you chose here.
 
-| `layout.usda` | layout / planning | placement, rows, instancing, LOD variant selections | committed |
+| `layout.usda` | layout / planning | placement, rows, instancing | committed |
 | `catalog.usda` | asset pipeline | references to published components — the parts list | generated |
 
 Four owners, four files, no merge conflicts, and a strict answer to "who wins" that nobody has
@@ -304,17 +304,27 @@ harness makes the second.**
 | Tier | Question | Owner | Status |
 |---|---|---|---|
 | **Tier 1 — Structural validity** | Is this valid USD? | The 28 built-in `UsdValidation` validators shipped with OpenUSD | delegated; we run the suite and report it |
-| **Tier 2 — Consumer fitness** | Is this asset usable by `ovphysx` (mass, colliders) and by `ovrtx` (resolved material bindings)? | Us | **this is the harness** |
+| **Tier 2 — Consumer fitness** | Is this asset usable by `ovphysx` and by `ovrtx`? | Us — five custom validators | **this is the harness** |
 | **Tier 3 — Engineering consistency** | Are the declared engineering values consistent with each other? | — | **designed, not built** |
 
-Tier 2 is what the project is for. A structurally valid asset can still be unusable: a rigid
-body with no mass, a material binding that resolves to nothing, a collision mesh at full
-resolution. `usdchecker` passes all three. `ovphysx` and `ovrtx` do not.
+A structurally valid asset can still be unusable. A rigid body with no mass, a material binding
+that resolves to nothing, a `RigidBodyAPI` prim with no collider — `usdchecker` passes all
+three; `ovphysx` and `ovrtx` do not. That gap is the harness.
 
-Tier 3 rules were specified and cut from the build. The domain data they would read **is**
-authored and its presence is validated — see §9 and `SIMREADY_SPEC.md` §6.
+The five Tier 2 rules, each registered into `UsdValidation.ValidationRegistry` and each per-prim:
 
-Rules, severities and payload flags: `SIMREADY_SPEC.md`.
+| Rule | Protects |
+|---|---|
+| `rigidbody_has_mass` | `ovphysx` |
+| `rigidbody_has_collider` | `ovphysx` |
+| `all_meshes_bound` | `ovrtx` |
+| `semantics_present` | SDG consumers |
+| `electrical_complete` | domain consumers — **presence only** |
+
+Tier 3 is specified and cut from the build. The domain data it would read **is** authored and
+its presence validated — see §9 and `SIMREADY_SPEC.md` §5.
+
+Full rules, severities and payload flags: `SIMREADY_SPEC.md`. The contract: `SCOPE.md`.
 
 ---
 

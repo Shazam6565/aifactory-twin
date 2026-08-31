@@ -11,7 +11,7 @@ by a domain expert who does not know USD.
 **The claim this harness makes:** valid USD and usable-by-`ovphysx` are different claims.
 `usdchecker` makes the first. This harness makes the second.
 
-> **Draft.** The numbers in §7 are representative placeholders and are labelled as such.
+> **Draft.** The numbers in §6 are representative placeholders and are labelled as such.
 > Replace any you can source properly, and do not present them as sourced until you have.
 
 ---
@@ -24,7 +24,7 @@ Every rule sits in exactly one tier. The tier says who owns the rule and what it
 |---|---|---|---|
 | **Tier 1 — Structural validity** | Is this valid USD? | The 28 built-in `UsdValidation` validators shipped with OpenUSD | delegated |
 | **Tier 2 — Consumer fitness** | Is this asset usable by `ovphysx` and `ovrtx`? | Us. These are the rules we write | **the harness** |
-| **Tier 3 — Engineering consistency** | Are the declared engineering values consistent with each other? | — | **designed, not built** — see §6 |
+| **Tier 3 — Engineering consistency** | Are the declared engineering values consistent with each other? | — | **designed, not built** — see §5 and §7 |
 
 Tier 2 is the point of the project. Tier 1 is table stakes and we delegate it. Tier 3 is
 specified and deliberately unimplemented.
@@ -67,112 +67,74 @@ If a rule is marked `no`, it must genuinely work unloaded. Verify it, do not ass
 
 ## 5. The rules
 
+`SCOPE.md` is the contract. It names **five** custom validators. Everything else here is
+delegated to the built-ins or is not built.
+
 ### Tier 1 — Structural validity
 
-**Is this valid USD?** Delegated in full to the built-in `UsdValidation` validators. We register
-no rule here and write no code; we run the suite and report what it returns.
+**Is this valid USD?** Delegated in full to the `UsdValidation` validators shipped with
+`usd-core` 26.8. We register nothing here and write no code; we run the suite and report what
+it returns.
 
-| ID | Rule | Built-in validator |
-|---|---|---|
-| SR-STRUCT-003 | Every reference and payload resolves | `usdUtilsValidators:MissingReferenceValidator` |
-| SR-STRUCT-005 | Attribute values match their declared type | `usdValidation:AttributeTypeMismatch` |
-| SR-PHYS-002 | Any `RigidBodyAPI` prim has at least one collision prim beneath it | `usdPhysicsValidators:ColliderChecker` |
-| SR-PHYS-004 | An articulated asset declares an articulation root | `usdPhysicsValidators:ArticulationChecker` |
-| — | The remaining built-ins run as a suite: encapsulation, subset families, material binding relationships, skel bindings, package and file-extension checks | 24 others |
+| Structural concern | Built-in validator(s) |
+|---|---|
+| References and payloads resolve | `usdUtilsValidators:MissingReferenceValidator` |
+| Composition errors surface | `usdValidation:CompositionErrorTest` |
+| Attribute values match declared type | `usdValidation:AttributeTypeMismatch` |
+| Stage metadata present and well-formed | `usdValidation:StageMetadataChecker`, `usdGeomValidators:StageMetadataChecker` |
+| Prim encapsulation rules | `usdGeomValidators:EncapsulationChecker`, `usdLuxValidators:EncapsulationRulesValidator`, `usdShadeValidators:EncapsulationRulesValidator`, `usdShadeValidators:EncapsulationMaterialValidator` |
+| Material binding relationships well-formed | `usdShadeValidators:MaterialBindingApiAppliedValidator`, `:MaterialBindingRelationships`, `:MaterialBindingCollectionValidator` |
+| Shader and texture compliance | `usdShadeValidators:ShaderSdrCompliance`, `:NormalMapTextureValidator` |
+| Geom subset families | `usdGeomValidators:SubsetFamilies`, `:SubsetParentIsImageable`, `usdShadeValidators:SubsetMaterialBindFamilyName`, `:SubsetsMaterialBindFamily` |
+| Physics schema application | `usdPhysicsValidators:RigidBodyChecker`, `:ColliderChecker`, `:ArticulationChecker`, `:PhysicsJointChecker` |
+| Skeleton bindings | `usdSkelValidators:SkelBindingApiAppliedValidator`, `:SkelBindingApiValidator` |
+| Packaging and file extensions | `usdUtilsValidators:PackageEncapsulationValidator`, `:RootPackageValidator`, `:UsdzPackageValidator`, `:FileExtensionValidator` |
 
-> **Confirm at step 10.** These attributions come from validator *names* registered by
-> `usd-core` 26.8. What each actually checks has **not** been verified. Run them against a
-> known-bad asset first. Where a built-in covers only part of a rule, the remainder moves to
-> Tier 2 and says so.
-
----
+> **Not yet verified.** These attributions come from validator *names*. What each actually
+> checks has not been confirmed. Run them against a known-bad asset before relying on the
+> mapping. Two in particular — `RigidBodyChecker` and `ColliderChecker` — may overlap the
+> custom rules below; if they fully cover them, the custom pair should be deleted rather than
+> duplicated.
 
 ### Tier 2 — Consumer fitness
 
-**Is this asset usable by the consumers that will read it?** These are the rules we write. Each
-names the consumer it protects.
+**Is this asset usable by `ovphysx` and by `ovrtx`?** These are the five custom validators from
+`SCOPE.md`, registered into `UsdValidation.ValidationRegistry` so they report through the same
+`ValidationError` type as the built-ins.
 
-#### 2.1 Physics consumer — `ovphysx`
+**None of them compare values across prims.** Every one is per-prim.
 
-| ID | Rule | Protects | Sev | Payload |
-|---|---|---|---|---|
-| SR-PHYS-001 | Any `RigidBodyAPI` prim declares mass > 0 | `ovphysx`: zero-mass rigid bodies are undefined in PhysX — they explode, sink, or stall the solver | error | no |
-| SR-PHYS-003 | Mesh colliders above the triangle threshold (§7) declare an approximation | `ovphysx`: full-resolution mesh colliders are the classic cause of a scene that renders at 60 fps and simulates at 2 | error | yes |
-| SR-PHYS-005 | Collision prims have a bound physics material | `ovphysx`: URDF friction lives in vendor extensions, so it is lost on import unless authored back, and contact behaviour silently falls to defaults | warning | yes |
+| ID | Rule | Protects | Checks | Sev | Payload |
+|---|---|---|---|---|---|
+| SR-PHYS-001 | `rigidbody_has_mass` | `ovphysx` — zero-mass rigid bodies are undefined in PhysX; they explode, sink, or stall the solver | Any `RigidBodyAPI` prim declares mass > 0 | error | no |
+| SR-PHYS-002 | `rigidbody_has_collider` | `ovphysx` — a rigid body with no collider falls through the world | Any `RigidBodyAPI` prim has at least one collision prim | error | yes |
+| SR-RENDER-001 | `all_meshes_bound` | `ovrtx` — a binding that exists but does not resolve is silent; `ComputeBoundMaterial()` returns invalid and the mesh renders as default surface | Every renderable mesh has a resolved material binding | error | yes |
+| SR-SDG-001 | `semantics_present` | SDG consumers — without labels, rendered images have no ground truth and cannot produce training data | Every asset-root prim carries a `UsdSemantics` label | error | no |
+| SR-ELEC-001 | `electrical_complete` | domain consumers — ADR-09 chose untyped custom attributes, where a typo becomes a new attribute rather than an error | Powered equipment declares power draw and phase. **Presence only:** the attribute exists and is non-null | error | no |
 
-#### 2.2 Render and sensor consumer — `ovrtx`
+#### ⚠ Unresolved: `thermal_complete`
 
-| ID | Rule | Protects | Sev | Payload |
-|---|---|---|---|---|
-| SR-RENDER-001 | Every renderable mesh resolves to a bound material | `ovrtx`: a binding that exists but does not resolve is silent — `ComputeBoundMaterial()` returns invalid and the mesh renders as default surface | error | yes |
-| SR-RENDER-002 | Collision-only meshes are marked non-renderable (`purpose` = `guide` or `proxy`) | `ovrtx`: otherwise collision proxies appear in renders and in sensor output, and they also fail SR-RENDER-001 spuriously | error | yes |
-| SR-RENDER-003 | Unique texture memory is under budget (§7) | `ovrtx`: texture memory, not triangle count, is what actually ends a large scene on a given GPU | warning | yes |
-| SR-STRUCT-004 | Every texture asset path resolves | `ovrtx`: missing textures render as a default surface — wrong, but not visibly broken | error | yes |
+| ID | Rule | Protects | Checks | Sev | Payload |
+|---|---|---|---|---|---|
+| SR-THERM-001 | `thermal_complete` | domain consumers — as `electrical_complete`, for the second domain | Heat-generating equipment declares heat output and cooling type. **Presence only** | error | no |
 
-#### 2.3 Synthetic data consumer
+**`SCOPE.md` lists five custom validators and this is not one of them.** It is retained here on
+an explicit instruction to keep it as a presence check. Either add it to `SCOPE.md` as a sixth,
+or delete it here. Do not leave the two documents disagreeing.
 
-| ID | Rule | Protects | Sev | Payload |
-|---|---|---|---|---|
-| SR-SDG-001 | The asset-root prim carries a semantic class label | SDG: without labels, rendered images have no ground truth and the asset cannot produce training data | error | no |
-| SR-SDG-002 | The label is drawn from the allowed class set (§7) | SDG: free-text labels fragment a dataset — `rack`, `Rack` and `rack_gb300` become three classes | error | no |
+### Tier 3 — Engineering consistency
 
-#### 2.4 Composition consumers — any referencing layer
-
-| ID | Rule | Protects | Sev | Payload |
-|---|---|---|---|---|
-| SR-STRUCT-001 | `metersPerUnit == 1.0` and `upAxis == "Z"` | Every consumer: mixed units silently corrupt every mass and distance downstream. The built-in `StageMetadataChecker` confirms the metadata exists; this rule checks it holds our values | error | no |
-| SR-STRUCT-002 | The layer declares a `defaultPrim` | Any referencing layer: without it, referencing the component requires an explicit prim path, so every consumer must know our internal naming | error | no |
-| SR-STRUCT-006 | Nothing references a component's sublayer directly — only its interface layer | Every consumer: ADR-04. Referencing `geo.usdc` yields geometry with materials, mass and colliders silently absent, and it looks correct in a viewport | error | no |
-| SR-STRUCT-007 | Prim names are valid USD identifiers | Every consumer: invalid names break path expressions and round-tripping | error | no |
-
-#### 2.5 Domain layer contract — presence only
-
-These rules check that the domain layers were **authored**. They check that an attribute exists
-and is non-null, and they check that a token is drawn from its allowed set.
-
-**They do not compare values, across prims or otherwise, and make no claim that the declared
-values are correct or mutually consistent.** That is Tier 3, and it is not built.
-
-| ID | Rule | Protects | Sev | Payload |
-|---|---|---|---|---|
-| SR-ELEC-001 | Powered equipment declares `aifactory:electrical:nominalPowerDrawW` and `:phase`, both non-null | Any consumer of the electrical layer: this rule exists because ADR-09 chose untyped custom attributes, where a typo becomes a new attribute rather than an error | error | no |
-| SR-ELEC-002 | Declared draw is positive and within the sanity range (§7) | Any consumer of the electrical layer: catches unit errors — a value entered in kW rather than W is off by a thousand and otherwise passes every rule. A single-value bounds check, not a comparison | error | no |
-| SR-ELEC-003 | `:phase` is drawn from the allowed token set (§7) | Any consumer of the electrical layer: untyped tokens accept anything, and `"3P"`, `"three-phase"` and `"3-phase"` cannot be compared | error | no |
-| SR-THERM-001 | Heat-generating equipment declares `aifactory:thermal:heatOutputW` and `:coolingType`, both non-null | Any consumer of the thermal layer: same reasoning as SR-ELEC-001, for the second domain | error | no |
-| SR-THERM-003 | `:coolingType` is drawn from the allowed token set (§7) | Any consumer of the thermal layer: as SR-ELEC-003 | error | no |
-
-#### 2.6 Pipeline provenance
-
-| ID | Rule | Protects | Sev | Payload |
-|---|---|---|---|---|
-| SR-PROV-001 | Every published component has a `manifest.json` entry with a source hash | Anyone auditing the pipeline: without it, "which source produced this, with which pipeline version" is archaeology | error | no |
-| SR-PROV-002 | A scene references only published components, never anything in `assets/source/` | The pipeline itself: ADR-08. A scene reaching into source assets means the pipeline was bypassed | error | no |
+**Designed, not built.** Nothing in this repository compares declared engineering values across
+prims, and nothing aggregates them. `power_budget_consistent` — summing rack draw against a
+declared distribution capacity — is specified and deliberately unimplemented; it needs a
+topology model of which racks feed from which unit, which this repo does not have. The layer
+architecture was designed to make such a rule cheap, and that capability is unused. The domain
+data is authored and its presence is validated; its correctness and mutual consistency are not.
+See §7.
 
 ---
 
-## 6. Tier 3 — Engineering consistency
-
-**Designed, not built.** No rule in this tier is implemented, registered, or run. Nothing in
-this repository compares declared engineering values across prims or aggregates them.
-
-Two rules were specified and then cut from the build:
-
-- **Row power budget.** Sum declared draw across the equipment fed by a distribution unit and
-  compare it against that unit's declared capacity.
-- **Heat against draw.** Compare a component's declared heat output against its declared power
-  draw, within a tolerance.
-
-They are recorded here because the layer architecture was designed to make them possible — the
-domain data is authored, sits on the asset root, and is readable with geometry unloaded — and
-because a future implementation should reuse those IDs rather than inventing new ones. The
-parameters they would need, including distribution-unit capacity and a heat-to-draw tolerance,
-are deliberately **not fixed** in §7, because fixing them would imply a rule that does not exist.
-
-See §8.
-
----
-
-## 7. The numbers
+## 6. The numbers
 
 > **Provenance warning.** Everything below is **chosen as representative** — order-of-magnitude
 > figures for a liquid-cooled AI rack, not vendor data and not measured. `README.md` says so
@@ -188,17 +150,12 @@ See §8.
 | Rack phase | `3P` | representative |
 | Rack cooling type | `liquid` | representative |
 | Rack mass | 1,400 kg | representative |
-| CDU power draw | 12,000 W | representative |
-| Racks per row | 8 | design parameter for assembly (M4) |
+| Racks per row | 8 | design parameter for assembly |
 
 ### Thresholds
 
-| Quantity | Value | Provenance |
-|---|---|---|
-| Mesh-collider triangle threshold (SR-PHYS-003) | 10,000 | chosen; PhysX convex hulls degrade well before this |
-| Power draw sanity range (SR-ELEC-002) | 100 W – 500,000 W | chosen to catch unit errors, not to be tight |
-| Texture memory budget, component (SR-RENDER-003) | 512 MB | chosen |
-| Texture memory budget, scene (SR-RENDER-003) | 4 GB | chosen |
+No thresholds remain. Every rule that needed one — collider triangle count, texture memory
+budget, power-draw sanity range — was cut with Tier 3 or is not among the five.
 
 ### Allowed token sets
 
@@ -206,29 +163,33 @@ See §8.
 |---|---|
 | `aifactory:electrical:phase` | `1P`, `3P` |
 | `aifactory:thermal:coolingType` | `air`, `liquid`, `hybrid` |
-| semantic class (SR-SDG-002) | `rack`, `cdu`, `pdu`, `floor_tile`, `robot` |
+| semantic class (SR-SDG-001) | `rack`, `cdu`, `pdu`, `floor_tile` |
 
 ---
 
-## 8. What this spec does not check
+## 7. What this spec does not check
 
-Stated plainly, because every omission below is somewhere a reader could otherwise think this
-claims more than it does.
+Mirrors the out-of-scope list in `SCOPE.md`. Stated plainly, because every omission below is
+somewhere a reader could otherwise think this claims more than it does.
 
-- **No cross-prim engineering consistency.** Nothing here compares a declared value on one prim
-  against a declared value on another, and nothing aggregates values across a row, a scene, or
-  any other grouping. The domain data is authored and its **presence** is validated. Its
-  **correctness and mutual consistency are not.** See §6.
-- **Not load-flow.** No phase imbalance, inrush, power factor, derating, fault current, or
-  selective coordination.
-- **Not CFD.** Nothing computes airflow, a temperature field, or hot spots.
-- **Not structural.** No floor loading, no seismic, no weight distribution.
+- **No cross-component engineering consistency.** Nothing compares a declared value on one prim
+  against a declared value on another, and nothing aggregates across a row, a scene or any other
+  grouping. `power_budget_consistent` is specified and **not implemented** — it needs a topology
+  model of which racks feed from which distribution unit. Designed, not built.
+- **No CFD, thermal solving, or electrical solving.** Never intended. Thermal and electrical
+  values are declared attributes, not solved fields. No load-flow, no phase imbalance, no fault
+  current, no airflow, no temperature field.
+- **No real geometry.** Components use dimensionally-plausible proxy boxes. The pipeline is the
+  artifact; the geometry is a placeholder.
+- **No LOD variant sets.** Designed, not built.
+- **No `ovstorage`, `ovstream`, or MCP/agent query tooling.** Out of scope entirely.
+- **No URDF import.** Not covered by this repo.
+- **No production scale.** Demonstrated to N = 4096 on one machine. The architecture is the
+  claim; the scale is an illustration.
 - **Not code compliance.** Not NEC, not ASHRAE, not IEC, not any standard. This is one worked
   example of a domain spec, mirroring how real partners define theirs.
-- **Not thermal-hydraulic.** Cooling type is a label. There is no loop model, no flow rate, no
-  approach temperature.
 
-## 9. Adding a rule
+## 8. Adding a rule
 
 The interface is deliberately small so that a domain expert who is not a USD expert can add one.
 

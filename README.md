@@ -34,19 +34,25 @@ makes the first. This harness makes the second.**
 
 ## What this is not
 
-Scoping honestly is itself the signal, so:
+A digital-twin product, an engineering analysis tool, or a decision system for whether a
+facility should be built. **It is a SimReady asset pipeline with a validation gate.**
 
-- **Not CFD.** There is no fluid solve. Thermal data is *declared* per component; the harness
-  checks it was authored, not that it is right.
-- **Not electrical solving.** No load-flow, no fault current, no harmonics.
-- **No cross-component engineering consistency.** Nothing compares declared values across prims
-  or aggregates them. That tier is designed and specified, and deliberately not built — see
-  `SIMREADY_SPEC.md` §6.
-- **Not photoreal.** Materials are correct and bound, not art-directed.
-- **Not gigawatt scale.** `N` tops out at a few thousand racks on one workstation.
-- **Not a product.** No UI, no persistence layer, no auth.
+`SCOPE.md` is the contract. Everything below is out of scope, stated up front rather than
+discovered later:
 
-The geometry is representative, not vendor CAD — see [Simulated vs. approximated](#simulated-vs-approximated).
+- **Cross-component engineering consistency.** `power_budget_consistent` — summing rack draw
+  against declared distribution capacity — is specified in `SIMREADY_SPEC.md` and **not
+  implemented**. It needs a topology model of which racks feed from which unit. Designed, not
+  built.
+- **CFD, thermal solving, electrical solving.** Never intended. Thermal and electrical values
+  are declared attributes, not solved fields.
+- **Real geometry.** Components use dimensionally-plausible proxy boxes. The pipeline is the
+  artifact; the geometry is a placeholder.
+- **LOD variant sets.** Designed, not built.
+- **`ovstorage`, `ovstream`, MCP/agent query tooling.** Out of scope entirely.
+- **URDF import.** Not covered by this repo.
+- **Production scale.** Demonstrated to N = 4096 on one machine. The architecture is the claim;
+  the scale is an illustration.
 
 ---
 
@@ -108,11 +114,12 @@ source of truth across disciplines, demonstrated rather than asserted.
 
 ```
 aifactory-twin/
+├── SCOPE.md                     # THE CONTRACT — what this repo does and does not claim
 ├── README.md                    # this file — the reference architecture
 ├── ARCHITECTURE.md              # layer strategy, composition decisions, decision log
-├── SIMREADY_SPEC.md             # the domain spec the validators encode  (planned)
-├── BENCHMARKS.md                # reproducible numbers, method stated    (planned)
-├── docs/BUILD_GUIDE.md          # step-by-step build order
+├── SIMREADY_SPEC.md             # the three validation tiers and the five custom rules
+├── BENCHMARKS.md                # CPU-only method stated; numbers unpopulated
+├── docs/GETTING_STARTED.md      # step-by-step build order
 │
 ├── assets/
 │   ├── source/                  # raw inputs — NEVER edited in place
@@ -123,11 +130,11 @@ aifactory-twin/
 ├── src/aifactory_twin/
 │   ├── ingest/                  # source → normalized USD (units, naming, xforms, manifest)
 │   ├── author/                  # layer authoring (simready, domain, assemble)
-│   ├── optimize/                # instancing strategies, LOD variant sets
-│   ├── validate/                # usdchecker + custom SimReady rules → report
+│   ├── optimize/                # instancing strategies
+│   ├── validate/                # built-in UsdValidation suite + 5 custom rules → report
 │   └── consume/                 # ovrtx render, ovphysx physics
 │
-├── tests/
+├── tests/broken/                # deliberately broken fixtures the gate must reject
 └── ci/validate.sh               # the gate
 ```
 
@@ -199,21 +206,22 @@ cost-awareness argument, and it is the honest reason for the split.
 
 ## Status
 
-Guarded table. **A row flips to ✅ only when the milestone genuinely runs.**
-`📐 designed` means specified and deliberately not built — it is not pending work.
+One row per `SCOPE.md` deliverable. **A row reads `built` only when its done-condition in
+`SCOPE.md` is demonstrably met.** `designed, not built` is a deliberate exclusion, not pending
+work.
 
-| Milestone | What it delivers | Status |
-|---|---|---|
-| M0 | Reference architecture + layer diagram | ✅ done |
-| M1 | Ingest + normalize + provenance manifest | ⬜ not started |
-| M2 | URDF interop — import, then author what URDF cannot express | ⬜ not started |
-| M3 | SimReady authoring — physics, materials, semantics, domain layers | ⬜ not started |
-| M4 | Assembly + both instancing strategies at N = 64 / 512 / 4096 | ⬜ not started |
-| M5 | Validation harness + CI gate — Tier 1 structural, Tier 2 consumer fitness | ⬜ not started |
-| M6 | Two consumers (ovrtx, ovphysx) over one stage at independent rates | ⬜ not started |
-| M7 | Reproducible benchmarks | ⬜ not started |
-| M8 | Packaged reference architecture | ⬜ not started |
-| — | Tier 3 engineering consistency — cross-prim comparison, aggregation | 📐 designed, not built |
+| # | Deliverable | Done when | Status |
+|---|---|---|---|
+| 1 | One layered component (`rack_gb300`) — interface layer, geometry payload, physics / material / domain sublayers | Each sublayer contains only its own opinions when opened in a text editor | ⬜ not started |
+| 2 | Unloaded-stage domain query | A script opens with `Usd.Stage.LoadNone` and prints power draw plus a composed prim count, no geometry loaded | ⬜ not started |
+| 3 | Five custom validators in `UsdValidation.ValidationRegistry` | They run alongside the 28 built-ins and report through the same `ValidationError` type | ⬜ not started |
+| 4 | `datahall.usda` — N racks scenegraph-instanced, floor tiles via `UsdGeomPointInstancer` | N is a CLI parameter; the gate passes at N = 64, 512, 4096 | ⬜ not started |
+| 5 | `ci/validate.sh` and a deliberately broken fixture | Running the gate against `tests/broken/` exits nonzero and names the offending prim | ⬜ not started |
+| — | Tier 3 engineering consistency — cross-prim comparison, aggregation | — | 📐 designed, not built |
+| — | LOD variant sets | — | 📐 designed, not built |
+
+Supporting docs, which exist but are not deliverables: `ARCHITECTURE.md`, `SIMREADY_SPEC.md`,
+`SCOPE.md`, `BENCHMARKS.md` (method stated, numbers unpopulated).
 
 ---
 
@@ -260,5 +268,8 @@ assume this repo produced it (ADR-11):
 
 ## Further reading
 
-- [ARCHITECTURE.md](ARCHITECTURE.md) — layer strategy, LIVRPS reasoning, decision log, URDF gap analysis
+- [SCOPE.md](SCOPE.md) — **the contract.** What this repo claims, and what it does not
+- [ARCHITECTURE.md](ARCHITECTURE.md) — layer strategy, LIVRPS reasoning, validation tiers, decision log
+- [SIMREADY_SPEC.md](SIMREADY_SPEC.md) — the three tiers and the five custom validators
+- [BENCHMARKS.md](BENCHMARKS.md) — CPU-only benchmark method
 - [docs/GETTING_STARTED.md](docs/GETTING_STARTED.md) — build it yourself: commands, signatures and a verification per step
