@@ -1,0 +1,11 @@
+#usda 1.0
+
+over "Rack"
+{
+    custom float aifactory:electrical:nominalPowerDrawW = 132000
+    custom token aifactory:electrical:phase = "3P"
+    custom token aifactory:semantic:class = "compute_rack"
+    custom token aifactory:thermal:coolingType = "liquid"
+    custom float aifactory:thermal:heatOutputW = 120000
+}
+
