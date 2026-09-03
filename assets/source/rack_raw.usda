@@ -1,0 +1,16 @@
+#usda 1.0
+
+(
+    metersPerUnit = 0.01
+    upAxis = "Y"
+)
+
+def Xform "VendorRack"
+{
+    def Cube "Body"
+    {
+        double size = 1
+        float3 xformOp:scale = (0.6, 1.2, 2.0)
+        uniform token[] xformOpOrder = ["xformOp:scale"]
+    }
+}
