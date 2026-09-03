@@ -1,0 +1,49 @@
+#usda 1.0
+(
+    defaultPrim = "World"
+    metersPerUnit = 1
+    upAxis = "Z"
+)
+
+def Xform "World"
+{
+    def Xform "Racks"
+    {
+        def Xform "Rack_000" (
+            instanceable = true
+            prepend references = @../components/rack_gb300/rack.usda@
+        )
+        {
+            double3 xformOp:translate = (0, 0, 0)
+            uniform token[] xformOpOrder = ["xformOp:translate"]
+        }
+
+        def Xform "Rack_001" (
+            instanceable = true
+            prepend references = @../components/rack_gb300/rack.usda@
+        )
+        {
+            double3 xformOp:translate = (2, 0, 0)
+            uniform token[] xformOpOrder = ["xformOp:translate"]
+        }
+
+        def Xform "Rack_002" (
+            instanceable = true
+            prepend references = @../components/rack_gb300/rack.usda@
+        )
+        {
+            double3 xformOp:translate = (4, 0, 0)
+            uniform token[] xformOpOrder = ["xformOp:translate"]
+        }
+
+        def Xform "Rack_003" (
+            instanceable = true
+            prepend references = @../components/rack_gb300/rack.usda@
+        )
+        {
+            double3 xformOp:translate = (6, 0, 0)
+            uniform token[] xformOpOrder = ["xformOp:translate"]
+        }
+    }
+}
+
