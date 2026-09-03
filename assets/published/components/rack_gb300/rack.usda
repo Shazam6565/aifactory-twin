@@ -1,0 +1,16 @@
+#usda 1.0
+(
+    defaultPrim = "Rack"
+    subLayers = [
+        @domain.usda@,
+        @physics.usda@,
+        @material.usda@
+    ]
+)
+
+def Xform "Rack" (
+    prepend payload = @./geo.usda@
+)
+{
+}
+
