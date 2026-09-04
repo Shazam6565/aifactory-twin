@@ -26,3 +26,8 @@ prep/
 
 # Private planning doc — kept on disk, out of the public repo.
 Project_spec.md
+
+# Local session artifacts — never part of the repo.
+*.log
+run_claude.sh
+.ipynb_checkpoints/

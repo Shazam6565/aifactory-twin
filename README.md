@@ -202,6 +202,25 @@ install from PyPI; `ovrtx` ships as a ~1.8 GB bundle on its GitHub Releases page
 Not paying for GPU time to check whether a rack declares its electrical phase is also a
 cost-awareness argument, and it is the honest reason for the split.
 
+### Opting in to the GPU side
+
+The NVIDIA [`ovrtx`](https://github.com/NVIDIA-Omniverse/ovrtx) SDK is vendored as a git
+submodule at `third_party/ovrtx`, pinned to the release tag that matches the wheel. It is
+marked `update = none` in `.gitmodules`, so a plain `git clone`, `git clone --recurse-submodules`
+or `git submodule update --init` all leave the directory empty. The `gpu` dependency group is
+likewise skipped by a plain `uv sync`, and its entries carry a `sys_platform == 'linux'` marker.
+
+On a Linux machine with an RTX-capable GPU and a supported NVIDIA driver, and **only there**:
+
+```bash
+git submodule update --init --checkout third_party/ovrtx
+uv sync --group gpu
+```
+
+The `ovrtx` package on PyPI is a stub that downloads the ~1.7 GB renderer from
+`pypi.nvidia.com` during install, which is why the second command is deliberately not part of
+the default setup. `aifactory_twin.consume` also refuses to import when `nvidia-smi` is absent.
+
 ---
 
 ## Status

@@ -21,3 +21,10 @@ build-backend = "uv_build"
 dev = [
     "pytest>=9.1.1",
 ]
+# Opt-in only: `uv sync --group gpu`. Never installed by a plain `uv sync`.
+# The PyPI ovrtx package is a wheel-stub that downloads the ~1.7 GB renderer
+# from pypi.nvidia.com at install time, so the platform marker matters.
+gpu = [
+    "ovrtx==0.4.1.*; sys_platform == 'linux'",
+    "ovstage>=0.1.0; sys_platform == 'linux'",
+]
