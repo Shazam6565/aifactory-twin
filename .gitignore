@@ -2,7 +2,7 @@
 logs/
 captures/
 state/
-.venv/
+.venv*/
 __pycache__/
 *.pyc
 .DS_Store
@@ -31,3 +31,6 @@ Project_spec.md
 *.log
 run_claude.sh
 .ipynb_checkpoints/
+
+# Render output written by aifactory_twin.consume.render_ovrtx --png
+_output/

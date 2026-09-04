@@ -168,7 +168,7 @@ one, state it, enforce it in CI.
 > milestones complete.
 
 ```bash
-uv sync
+uv sync            # CPU side only: usd-core + pytest. Never pulls anything GPU-related.
 
 # M1 — ingest a source asset into a normalized, layered component
 python -m aifactory_twin.ingest assets/source/rack_gb300.usda
@@ -179,7 +179,8 @@ python -m aifactory_twin.author.assemble --racks 512 --instancing scenegraph
 # M5 — validate; this is the gate
 ./ci/validate.sh assets/published/scenes/datahall.usda
 
-# M6 — two independent consumers over one stage (Linux + NVIDIA GPU only)
+# M6 — two independent consumers over one stage (Linux + NVIDIA GPU only;
+#      requires the opt-in under "Platform split" first)
 python -m aifactory_twin.consume.render_ovrtx   assets/published/scenes/datahall.usda
 python -m aifactory_twin.consume.physics_ovphysx assets/published/scenes/datahall.usda
 ```
@@ -192,12 +193,28 @@ The pipeline is deliberately split so that most of it needs no GPU:
 
 | Work | Runs on | Needs |
 |---|---|---|
-| Ingest, layer authoring, instancing, validation, stage-side benchmarks (M1–M5, M7a) | macOS laptop | `usd-core` only |
-| ovrtx render, ovphysx physics, ovstage multi-rate consumers, GPU benchmarks (M6, M7b) | Linux + NVIDIA GPU | EA wheels, see below |
+| Ingest, layer authoring, instancing, validation, stage-side benchmarks (M1–M5, M7a) | macOS or x86_64 Linux laptop, no GPU | `usd-core` only (default `uv sync`) |
+| ovrtx render, ovphysx physics, ovstage multi-rate consumers, GPU benchmarks (M6, M7b) | Linux + NVIDIA RTX GPU + driver | `gpu` dependency group and the `third_party/ovrtx` submodule, see below |
 
-`ovrtx`, `ovphysx`, `ovstage` and `ovstorage` publish **Linux x86_64/aarch64 and Windows
-builds only — there is no macOS build of any of them.** `ovphysx`, `ovstage` and `ovstorage`
-install from PyPI; `ovrtx` ships as a ~1.8 GB bundle on its GitHub Releases page.
+**`usd-core`** is Pixar's OpenUSD library packaged for Python and published on PyPI. It provides
+the `pxr` module — `Usd`, `Sdf`, `UsdGeom`, `UsdPhysics`, `UsdShade`, `Gf` — that every script
+under `src/aifactory_twin/` imports. The "core" build ships the composition engine and schemas
+without the imaging stack, `usdview` or any Hydra render delegate, which is exactly enough to
+author and validate a stage on a CPU. It is pinned to 26.8 so the numbers in `BENCHMARKS.md`
+stay reproducible.
+
+Two platform caveats:
+
+- **`usd-core` has no aarch64 Linux wheel** in any released version, so `pyproject.toml`
+  declares it with `platform_machine != 'aarch64'`. On an arm64 box such as a DGX Spark / GB10
+  the CPU side (ingest, author, validate) is therefore not installable and `pxr` will not
+  import; that machine is a **consume-only host** and runs the GPU side only. To author on
+  arm64 you would need an OpenUSD built from source or the one bundled with Isaac Sim /
+  Omniverse Kit.
+- **`ovrtx`, `ovphysx`, `ovstage` and `ovstorage` publish Linux x86_64/aarch64 and Windows
+  builds only — there is no macOS build of any of them.** All four install from PyPI. The
+  `ovrtx` entry on PyPI is a small stub that fetches the ~1.7 GB renderer from
+  `pypi.nvidia.com` at install time; the same bundle is also on the ovrtx GitHub Releases page.
 
 Not paying for GPU time to check whether a rack declares its electrical phase is also a
 cost-awareness argument, and it is the honest reason for the split.
@@ -215,11 +232,25 @@ On a Linux machine with an RTX-capable GPU and a supported NVIDIA driver, and **
 ```bash
 git submodule update --init --checkout third_party/ovrtx
 uv sync --group gpu
+uv run python -m aifactory_twin.consume.render_ovrtx --png   # writes _output/render.png
 ```
 
-The `ovrtx` package on PyPI is a stub that downloads the ~1.7 GB renderer from
-`pypi.nvidia.com` during install, which is why the second command is deliberately not part of
-the default setup. `aifactory_twin.consume` also refuses to import when `nvidia-smi` is absent.
+Run consumers as modules from the repo root, as above, so the package guard executes. If the
+machine also carries a hand-built venv (JupyterLab, torch), point uv at its own directory first
+with `export UV_PROJECT_ENVIRONMENT=.venv-twin`; a bare `uv sync` otherwise reconciles `.venv`
+to the lockfile and removes everything it does not know about.
+
+The second command is deliberately not part of the default setup because of the ~1.7 GB
+download described above. As a last line of defence, `aifactory_twin.consume` exits with a
+clear message on import when `nvidia-smi` is not on `PATH`.
+
+To move to a newer ovrtx release, check out the new tag inside the submodule, commit the moved
+pointer, and bump the version in the `gpu` group of `pyproject.toml` to match:
+
+```bash
+git -C third_party/ovrtx fetch --tags && git -C third_party/ovrtx checkout v0.5.0
+git add third_party/ovrtx pyproject.toml && uv lock
+```
 
 ---
 

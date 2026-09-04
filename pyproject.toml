@@ -9,7 +9,9 @@ authors = [
 requires-python = ">=3.12"
 dependencies = [
     "numpy>=2.5.2",
-    "usd-core==26.8",  # pinned: M7 benchmarks must be reproducible
+    # pinned: M7 benchmarks must be reproducible. No aarch64 wheel exists for any
+    # release, so arm64 hosts (DGX Spark / GB10) skip it and act as consume-only.
+    "usd-core==26.8; platform_machine != 'aarch64'",
 ]
 
 
@@ -27,4 +29,5 @@ dev = [
 gpu = [
     "ovrtx==0.4.1.*; sys_platform == 'linux'",
     "ovstage>=0.1.0; sys_platform == 'linux'",
+    "pillow>=11; sys_platform == 'linux'",
 ]
