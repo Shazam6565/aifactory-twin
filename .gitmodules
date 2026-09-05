@@ -4,3 +4,9 @@
 	update = none
 	shallow = true
 	branch = main
+[submodule "third_party/physx"]
+	path = third_party/physx
+	url = https://github.com/NVIDIA-Omniverse/PhysX.git
+	update = none
+	shallow = true
+	branch = main

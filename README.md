@@ -194,7 +194,7 @@ The pipeline is deliberately split so that most of it needs no GPU:
 | Work | Runs on | Needs |
 |---|---|---|
 | Ingest, layer authoring, instancing, validation, stage-side benchmarks (M1–M5, M7a) | macOS or x86_64 Linux laptop, no GPU | `usd-core` only (default `uv sync`) |
-| ovrtx render, ovphysx physics, ovstage multi-rate consumers, GPU benchmarks (M6, M7b) | Linux + NVIDIA RTX GPU + driver | `gpu` dependency group and the `third_party/ovrtx` submodule, see below |
+| ovrtx render, ovphysx physics, ovstage multi-rate consumers, GPU benchmarks (M6, M7b) | Linux + NVIDIA RTX GPU + driver | `gpu` dependency group and the `third_party/ovrtx` and `third_party/physx` submodules, see below |
 
 **`usd-core`** is Pixar's OpenUSD library packaged for Python and published on PyPI. It provides
 the `pxr` module — `Usd`, `Sdf`, `UsdGeom`, `UsdPhysics`, `UsdShade`, `Gf` — that every script
@@ -221,16 +221,23 @@ cost-awareness argument, and it is the honest reason for the split.
 
 ### Opting in to the GPU side
 
-The NVIDIA [`ovrtx`](https://github.com/NVIDIA-Omniverse/ovrtx) SDK is vendored as a git
-submodule at `third_party/ovrtx`, pinned to the release tag that matches the wheel. It is
-marked `update = none` in `.gitmodules`, so a plain `git clone`, `git clone --recurse-submodules`
-or `git submodule update --init` all leave the directory empty. The `gpu` dependency group is
-likewise skipped by a plain `uv sync`, and its entries carry a `sys_platform == 'linux'` marker.
+Two NVIDIA SDKs are vendored as git submodules, each pinned to the release tag that matches
+the wheel:
+
+| Submodule | Upstream | Pinned at | Covers |
+|---|---|---|---|
+| `third_party/ovrtx` | [NVIDIA-Omniverse/ovrtx](https://github.com/NVIDIA-Omniverse/ovrtx) | `v0.4.1` | the RTX render consumer |
+| `third_party/physx` | [NVIDIA-Omniverse/PhysX](https://github.com/NVIDIA-Omniverse/PhysX.git) | `ovphysx-0.5.11` | the PhysX SDK and the `ovphysx` physics consumer built from it |
+
+Both are marked `update = none` in `.gitmodules`, so a plain `git clone`, `git clone
+--recurse-submodules` or `git submodule update --init` all leave the directories empty. The
+`gpu` dependency group is likewise skipped by a plain `uv sync`, and its entries carry a
+`sys_platform == 'linux'` marker.
 
 On a Linux machine with an RTX-capable GPU and a supported NVIDIA driver, and **only there**:
 
 ```bash
-git submodule update --init --checkout third_party/ovrtx
+git submodule update --init --checkout third_party/ovrtx third_party/physx
 uv sync --group gpu
 uv run python -m aifactory_twin.consume.render_ovrtx --png   # writes _output/render.png
 ```
@@ -244,13 +251,17 @@ The second command is deliberately not part of the default setup because of the 
 download described above. As a last line of defence, `aifactory_twin.consume` exits with a
 clear message on import when `nvidia-smi` is not on `PATH`.
 
-To move to a newer ovrtx release, check out the new tag inside the submodule, commit the moved
-pointer, and bump the version in the `gpu` group of `pyproject.toml` to match:
+To move to a newer release, check out the new tag inside the submodule, commit the moved
+pointer, and bump the matching version in the `gpu` group of `pyproject.toml`:
 
 ```bash
 git -C third_party/ovrtx fetch --tags && git -C third_party/ovrtx checkout v0.5.0
-git add third_party/ovrtx pyproject.toml && uv lock
+git -C third_party/physx fetch --tags && git -C third_party/physx checkout ovphysx-0.5.11
+git add third_party/ovrtx third_party/physx pyproject.toml && uv lock
 ```
+
+`third_party/physx` is shallow-cloned, so `fetch --tags` is required before any tag other than
+the pinned one resolves.
 
 ---
 
