@@ -11,6 +11,7 @@ dependencies = [
     "numpy>=2.5.2",
     # pinned: M7 benchmarks must be reproducible. No aarch64 wheel exists for any
     # release, so arm64 hosts (DGX Spark / GB10) skip it and act as consume-only.
+    "ovphysx>=0.5.11",
     "usd-core==26.8; platform_machine != 'aarch64'",
 ]
 
