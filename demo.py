@@ -23,6 +23,7 @@ def run_validation():
         raise RuntimeError("Validation failed")
 
     print("Validation PASS", flush=True)
+    return "PASS"
 
 def run_ovrtx():
     print("\n[2/3] Running OVRTX render...", flush=True)
@@ -56,6 +57,7 @@ def run_ovrtx():
 
     print(f"Render written to {render_path}", flush=True)
     print("OVRTX PASS", flush=True)
+    return "PASS"
 
 def run_ovphysx():
     print("\n[3/3] Running OVPhysX simulation...", flush=True)
@@ -85,14 +87,24 @@ def run_ovphysx():
     )
 
     print("OVPhysX PASS", flush=True)
+    return "PASS"
 
 def main():
     print("=== SimReady POC Demo ===", flush=True)
     print(f"Output directory: {OUTPUT_DIR}", flush=True)
 
-    run_validation()
-    run_ovrtx()
-    run_ovphysx()
+    validation = run_validation()
+    ovrtx = run_ovrtx()
+    ovphysx = run_ovphysx()
+
+    summary = {
+        "validation": validation,
+        "ovrtx": ovrtx,
+        "ovphysx": ovphysx,
+        "overall": "PASS",
+    }
+    with open(OUTPUT_DIR / "summary.json", "w") as f:
+        json.dump(summary, f, indent=2)
 
     print("\n=== POC RESULT: PASS ===", flush=True)
 
