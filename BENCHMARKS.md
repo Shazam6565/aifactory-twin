@@ -60,7 +60,7 @@ adjacent rows is the cost or saving of that one decision.
 
 ## What these numbers will and will not show
 
-**Will show:** the effect of the composition decisions in `ARCHITECTURE.md` — what payloading
+**Will show:** the effect of the composition decisions in `DESIGN_NOTES.md` — what payloading
 geometry saves at stage-open, and what instancing does to composed prim count.
 
 **Will not show:** anything about rendering or simulation performance. A low prim count does not

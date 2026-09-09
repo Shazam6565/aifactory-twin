@@ -55,7 +55,7 @@ Rules apply to a **component** (one published asset under `assets/published/comp
 **scene** (an assembled stage under `assets/published/scenes/`). Every component rule also runs
 over the components a scene references.
 
-`ARCHITECTURE.md` §3 puts domain metadata on the asset-root prim so it survives with geometry
+`DESIGN_NOTES.md` §3 puts domain metadata on the asset-root prim so it survives with geometry
 unloaded. This spec is written to exploit that.
 
 - **Fast pass** — every rule marked `Payload: no`, run against a `LoadNone` stage.

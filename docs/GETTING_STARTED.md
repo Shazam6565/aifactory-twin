@@ -165,7 +165,7 @@ not part of the pipeline.
 
 ```python
 """One-shot generator standing in for vendor CAD. Run once; commit the output;
-never run it again. See ARCHITECTURE.md ADR-08."""
+never run it again. See DESIGN_NOTES.md ADR-08."""
 
 def make_rack(out_path: str) -> None:
     """Emit a rack at representative dimensions as simple box geometry.
@@ -272,7 +272,7 @@ assets/published/components/rack_gb300/
 
 ```python
 def split_into_layers(component_dir: str, asset_name: str) -> None:
-    """Write the per-component layer stack described in ARCHITECTURE.md section 3.
+    """Write the per-component layer stack described in DESIGN_NOTES.md section 3.
 
     - geometry to geo.usdc with its own defaultPrim
     - interface layer defs the asset-root prim and attaches geometry as a PAYLOAD:
@@ -320,7 +320,7 @@ Move the payload assertion into `tests/test_composition.py` now, while it is fre
 test most likely to catch a real regression later.
 
 - [ ] payload defers, proven by the assertion
-- [ ] sublayer order matches `ARCHITECTURE.md` §3, verified by printing it
+- [ ] sublayer order matches `DESIGN_NOTES.md` §3, verified by printing it
 - [ ] `usdcat --flatten` shows the composed result
 - [ ] test committed
 
@@ -500,7 +500,7 @@ domain rules against a `LoadNone` stage, everything needing geometry against a l
 Report both timings.
 
 **Verify first that `ValidationContext` will run against a `LoadNone` stage** — the fast domain
-gate in `ARCHITECTURE.md` §3 depends on it. If it will not, run the domain validators directly
+gate in `DESIGN_NOTES.md` §3 depends on it. If it will not, run the domain validators directly
 against the unloaded stage and reserve the context for the full pass. Either way, find out
 before building on the assumption.
 

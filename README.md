@@ -58,9 +58,10 @@ discovered later:
 
 ## The layer architecture
 
-This is the part worth reading. Full rationale, a glossary of the terms used precisely
+This is the part worth reading. The current, as-built V1 story is in
+[ARCHITECTURE.md](ARCHITECTURE.md). The full rationale, a glossary of the terms used precisely
 below (*component*, *interface layer*, *stage consumer*), and the decision log live in
-[ARCHITECTURE.md](ARCHITECTURE.md).
+[DESIGN_NOTES.md](DESIGN_NOTES.md).
 
 ### Per component
 
@@ -116,7 +117,8 @@ source of truth across disciplines, demonstrated rather than asserted.
 aifactory-twin/
 ├── SCOPE.md                     # THE CONTRACT — what this repo does and does not claim
 ├── README.md                    # this file — the reference architecture
-├── ARCHITECTURE.md              # layer strategy, composition decisions, decision log
+├── ARCHITECTURE.md              # current, as-built V1 architecture story
+├── DESIGN_NOTES.md              # layer strategy, composition decisions, decision log
 ├── SIMREADY_SPEC.md             # the three validation tiers and the six custom rules
 ├── BENCHMARKS.md                # CPU-only method stated; numbers unpopulated
 ├── docs/GETTING_STARTED.md      # step-by-step build order
@@ -281,8 +283,8 @@ work.
 | — | Tier 3 engineering consistency — cross-prim comparison, aggregation | — | 📐 designed, not built |
 | — | LOD variant sets | — | 📐 designed, not built |
 
-Supporting docs, which exist but are not deliverables: `ARCHITECTURE.md`, `SIMREADY_SPEC.md`,
-`SCOPE.md`, `BENCHMARKS.md` (method stated, numbers unpopulated).
+Supporting docs, which exist but are not deliverables: `ARCHITECTURE.md`, `DESIGN_NOTES.md`,
+`SIMREADY_SPEC.md`, `SCOPE.md`, `BENCHMARKS.md` (method stated, numbers unpopulated).
 
 ---
 
@@ -330,7 +332,8 @@ assume this repo produced it (ADR-11):
 ## Further reading
 
 - [SCOPE.md](SCOPE.md) — **the contract.** What this repo claims, and what it does not
-- [ARCHITECTURE.md](ARCHITECTURE.md) — layer strategy, LIVRPS reasoning, validation tiers, decision log
+- [ARCHITECTURE.md](ARCHITECTURE.md) — the current, as-built V1 architecture story
+- [DESIGN_NOTES.md](DESIGN_NOTES.md) — layer strategy, LIVRPS reasoning, validation tiers, decision log
 - [SIMREADY_SPEC.md](SIMREADY_SPEC.md) — the three tiers and the six custom validators
 - [BENCHMARKS.md](BENCHMARKS.md) — CPU-only benchmark method
 - [docs/GETTING_STARTED.md](docs/GETTING_STARTED.md) — build it yourself: commands, signatures and a verification per step

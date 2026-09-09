@@ -54,7 +54,7 @@ validators, so they run alongside the 28 built-ins and report through the same
 `ValidationError` type. One report, one severity model, one runner.
 
 Still to confirm at step 10: whether `ValidationContext` can be driven against a `LoadNone`
-stage, which is what the fast domain gate in `ARCHITECTURE.md` §3 depends on. If it cannot, the
+stage, which is what the fast domain gate in `DESIGN_NOTES.md` §3 depends on. If it cannot, the
 domain rules run standalone against an unloaded stage and the built-ins run in the full pass.
 
 Fallback if ever needed: a full OpenUSD build with `usdchecker` exists locally at
