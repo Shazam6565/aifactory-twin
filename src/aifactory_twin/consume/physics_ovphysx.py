@@ -5,6 +5,7 @@
 # Tutorial marker comments below define the included range.
 
 # [tutorial-start]
+import json
 import ovphysx
 from ovphysx import PhysX, TensorType
 from pathlib import Path
@@ -12,6 +13,8 @@ import numpy as np
 
 
 print("Using ovphysx version: ", ovphysx.__version__)
+
+REPO_ROOT = Path(__file__).resolve().parents[3]
 
 def attach_scene(physx, usd_path):
     import ovstage
@@ -33,8 +36,7 @@ def attach_scene(physx, usd_path):
         stage.destroy()
         raise
 
-script_dir = Path(__file__).resolve().parent
-usd_path = script_dir / "/home/as22cq/Projects/aifactory-twin/assets/published/scenes/rack_physics.usda"
+usd_path = REPO_ROOT / "assets/published/scenes/rack_physics.usda"
 
 # Initialize PhysX
 physx = PhysX()
@@ -56,9 +58,10 @@ try:
 
     # BEFORE
     pose_binding.read(poses)
+    before_pose = poses[0].copy()
 
-    print("BEFORE pose:", poses[0])
-    print("BEFORE Z:", poses[0][2])
+    print("BEFORE pose:", before_pose)
+    print("BEFORE Z:", before_pose[2])
 
     # SIMULATE
     dt = 1.0 / 60.0
@@ -69,12 +72,37 @@ try:
 
     # AFTER
     pose_binding.read(poses)
+    after_pose = poses[0].copy()
 
-    print("AFTER pose:", poses[0])
-    print("AFTER Z:", poses[0][2])
+    print("AFTER pose:", after_pose)
+    print("AFTER Z:", after_pose[2])
 
     pose_binding.destroy()
     print("Simulation step completed successfully")
+
+    before_x, before_y, before_z = (float(v) for v in before_pose[:3])
+    after_x, after_y, after_z = (float(v) for v in after_pose[:3])
+
+    results = {
+        "before": {
+            "x": before_x,
+            "y": before_y,
+            "z": before_z,
+        },
+        "after": {
+            "x": after_x,
+            "y": after_y,
+            "z": after_z,
+        },
+        "pose_changed": bool(not np.array_equal(before_pose, after_pose)),
+    }
+
+    output_path = REPO_ROOT / "output" / "demo" / "physics_results.json"
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    with open(output_path, "w") as f:
+        json.dump(results, f, indent=2)
+
+    print(f"Results written to {output_path}")
 finally:
     if stage is not None:
         physx.detach_ovstage()

@@ -17,7 +17,8 @@ import ovrtx
 import ovstage
 from PIL import Image
 
-USD_URL = "/home/as22cq/Projects/aifactory-twin/assets/published/scenes/rack_render.usda"
+REPO_ROOT = Path(__file__).resolve().parents[3]
+USD_URL = str(REPO_ROOT / "assets/published/scenes/rack_render.usda")
 
 
 def main():
