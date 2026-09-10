@@ -1,0 +1,39 @@
+## Structural — PASS
+
+- PASS — stage_opens: USD stage opened successfully
+- PASS — default_prim_present: defaultPrim is /World
+- PASS — composition_resolves: No USD composition errors detected
+## Conclusion
+
+The asset satisfied all blocking POC evaluation categories.
+
+## Render — PASS
+
+- PASS — ovrtx_execution: Demo workflow reported successful OVRTX execution
+- PASS — render_output_exists: OVRTX produced a non-empty render output — artifact: `/home/as22cq/Projects/aifactory-twin/output/demo/render.png`
+## Conclusion
+
+The asset satisfied all blocking POC evaluation categories.
+
+## Physics — PASS
+
+- PASS — ovphysx_execution: Demo workflow reported successful OVPhysX execution
+- PASS — physics_output_exists: Physics result artifact was produced — artifact: `/home/as22cq/Projects/aifactory-twin/output/demo/physics_results.json`
+- PASS — pose_changed: Rigid-body pose changed after OVPhysX simulation
+## Conclusion
+
+The asset satisfied all blocking POC evaluation categories.
+
+## Domain — PASS
+
+- PASS — nominal_power_present: Nominal power draw is 132000.0 W (`/World/Rack`)
+- PASS — cooling_type_present: Cooling type is liquid (`/World/Rack`)
+## Conclusion
+
+The asset satisfied all blocking POC evaluation categories.
+
+# SimReady POC Evaluation
+
+**Asset:** `rack_render.usda`
+
+**Overall Result:** PASS

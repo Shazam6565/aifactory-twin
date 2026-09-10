@@ -1,0 +1,80 @@
+{
+  "asset": "rack_render.usda",
+  "overall_status": "PASS",
+  "categories": {
+    "structural": {
+      "status": "PASS",
+      "checks": [
+        {
+          "name": "stage_opens",
+          "status": "PASS",
+          "message": "USD stage opened successfully"
+        },
+        {
+          "name": "default_prim_present",
+          "status": "PASS",
+          "message": "defaultPrim is /World"
+        },
+        {
+          "name": "composition_resolves",
+          "status": "PASS",
+          "message": "No USD composition errors detected"
+        }
+      ]
+    },
+    "render": {
+      "status": "PASS",
+      "checks": [
+        {
+          "name": "ovrtx_execution",
+          "status": "PASS",
+          "message": "Demo workflow reported successful OVRTX execution"
+        },
+        {
+          "name": "render_output_exists",
+          "status": "PASS",
+          "message": "OVRTX produced a non-empty render output",
+          "artifact": "/home/as22cq/Projects/aifactory-twin/output/demo/render.png"
+        }
+      ]
+    },
+    "physics": {
+      "status": "PASS",
+      "checks": [
+        {
+          "name": "ovphysx_execution",
+          "status": "PASS",
+          "message": "Demo workflow reported successful OVPhysX execution"
+        },
+        {
+          "name": "physics_output_exists",
+          "status": "PASS",
+          "message": "Physics result artifact was produced",
+          "artifact": "/home/as22cq/Projects/aifactory-twin/output/demo/physics_results.json"
+        },
+        {
+          "name": "pose_changed",
+          "status": "PASS",
+          "message": "Rigid-body pose changed after OVPhysX simulation"
+        }
+      ]
+    },
+    "domain": {
+      "status": "PASS",
+      "checks": [
+        {
+          "name": "nominal_power_present",
+          "status": "PASS",
+          "message": "Nominal power draw is 132000.0 W",
+          "prim_path": "/World/Rack"
+        },
+        {
+          "name": "cooling_type_present",
+          "status": "PASS",
+          "message": "Cooling type is liquid",
+          "prim_path": "/World/Rack"
+        }
+      ]
+    }
+  }
+}
