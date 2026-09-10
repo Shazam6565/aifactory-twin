@@ -1,0 +1,73 @@
+{
+  "asset": "rack_render.usda",
+  "overall_status": "FAIL",
+  "categories": {
+    "structural": {
+      "status": "PASS",
+      "checks": [
+        {
+          "name": "stage_opens",
+          "status": "PASS",
+          "message": "USD stage opened successfully"
+        },
+        {
+          "name": "default_prim_present",
+          "status": "PASS",
+          "message": "defaultPrim is /World"
+        },
+        {
+          "name": "composition_resolves",
+          "status": "PASS",
+          "message": "No USD composition errors detected"
+        }
+      ]
+    },
+    "render": {
+      "status": "FAIL",
+      "checks": [
+        {
+          "name": "material_bindings_resolve",
+          "status": "FAIL",
+          "message": "One or more renderable meshes have no resolved material binding",
+          "details": [
+            "/World/Rack/Body"
+          ]
+        }
+      ]
+    },
+    "physics": {
+      "status": "PASS",
+      "checks": [
+        {
+          "name": "rigidbody_has_mass",
+          "status": "PASS",
+          "message": "Rigid body mass is 1000.0",
+          "prim_path": "/World/Rack"
+        },
+        {
+          "name": "rigidbody_has_collider",
+          "status": "PASS",
+          "message": "Rigid body has a collider",
+          "prim_path": "/World/Rack"
+        }
+      ]
+    },
+    "domain": {
+      "status": "PASS",
+      "checks": [
+        {
+          "name": "nominal_power_present",
+          "status": "PASS",
+          "message": "Nominal power draw is 132000.0 W",
+          "prim_path": "/World/Rack"
+        },
+        {
+          "name": "cooling_type_present",
+          "status": "PASS",
+          "message": "Cooling type is liquid",
+          "prim_path": "/World/Rack"
+        }
+      ]
+    }
+  }
+}

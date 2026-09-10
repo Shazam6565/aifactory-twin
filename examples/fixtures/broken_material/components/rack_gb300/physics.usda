@@ -1,0 +1,15 @@
+#usda 1.0
+
+over "Rack" (
+    prepend apiSchemas = ["PhysicsRigidBodyAPI", "PhysicsMassAPI"]
+)
+{
+    float physics:mass = 1000
+
+    over "Body" (
+        prepend apiSchemas = ["PhysicsCollisionAPI"]
+    )
+    {
+    }
+}
+

@@ -1,0 +1,14 @@
+#usda 1.0
+
+# Deliberately missing PhysicsMassAPI / physics:mass — this fixture exists to
+# make rigidbody_has_mass fail while everything else stays valid.
+over "Rack" (
+    prepend apiSchemas = ["PhysicsRigidBodyAPI"]
+)
+{
+    over "Body" (
+        prepend apiSchemas = ["PhysicsCollisionAPI"]
+    )
+    {
+    }
+}

@@ -1,0 +1,79 @@
+#usda 1.0
+(
+    defaultPrim = "World"
+    metersPerUnit = 1
+    upAxis = "Z"
+)
+
+# Diagnostic scene for the ovphysx consumer.
+#
+# The rack is a rigid body (PhysicsRigidBodyAPI + PhysicsMassAPI, authored in
+# the component's physics.usda) and is deliberately placed 2 m up. Its Body
+# cube is 1 m half-height, so it starts with a 1 m air gap under it.
+#
+#           Rack        bottom at Z = +1
+#            |  gravity
+#            v
+#   ==================  Ground, top face at Z = 0
+#
+# Before simulation the rack is high; after simulation gravity must have moved
+# it down and the ground must have stopped it. That is the whole test: if the
+# rack does not move, physics never ran; if it keeps going, the ground is not
+# colliding.
+
+def Xform "World"
+{
+    def Xform "Rack" (
+        prepend references = @../components/rack_gb300/rack.usda@
+    )
+    {
+        double3 xformOp:translate = (0, 0, 2)
+        uniform token[] xformOpOrder = ["xformOp:translate"]
+    }
+
+    # Static collider: PhysicsCollisionAPI but deliberately NO
+    # PhysicsRigidBodyAPI. Collision without a rigid body is what makes a prim
+    # immovable world geometry rather than something that also falls.
+    def Cube "Ground" (
+        prepend apiSchemas = ["PhysicsCollisionAPI", "MaterialBindingAPI"]
+    )
+    {
+        float3[] extent = [(-0.5, -0.5, -0.5), (0.5, 0.5, 0.5)]
+        double size = 1
+
+        rel material:binding = </World/Looks/GroundMaterial>
+
+        # 50 x 50 x 0.5 slab, sunk by half its thickness so the top face
+        # lands exactly on Z = 0.
+        double3 xformOp:translate = (0, 0, -0.25)
+        float3 xformOp:scale = (50, 50, 0.5)
+        uniform token[] xformOpOrder = [
+            "xformOp:translate",
+            "xformOp:scale"
+        ]
+    }
+
+    def Scope "Looks"
+    {
+        def Material "GroundMaterial"
+        {
+            token outputs:surface.connect = </World/Looks/GroundMaterial/Shader.outputs:surface>
+
+            def Shader "Shader"
+            {
+                uniform token info:id = "UsdPreviewSurface"
+                color3f inputs:diffuseColor = (0.35, 0.35, 0.38)
+                float inputs:roughness = 0.8
+                token outputs:surface
+            }
+        }
+    }
+}
+
+# The environment the simulation runs in, not an object in it. Sibling of
+# World, the same way the Render settings sit beside World in rack_render.usda.
+def PhysicsScene "PhysicsScene"
+{
+    vector3f physics:gravityDirection = (0, 0, -1)
+    float physics:gravityMagnitude = 9.81
+}
