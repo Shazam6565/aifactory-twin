@@ -1,5 +1,6 @@
-from pxr import Usd     
+from pxr import Usd, UsdGeom, UsdShade, UsdPhysics
 import json
+import sys
 from pathlib import Path
 
 
@@ -108,8 +109,8 @@ def check_composition_errors(asset_path):
         }
 
 
-def check_ovrtx_execution():
-    summary_path = OUTPUT_DIR / "summary.json"
+def check_ovrtx_execution(output_dir):
+    summary_path = output_dir / "summary.json"
 
     if not summary_path.exists():
         return {
@@ -144,8 +145,8 @@ def check_ovrtx_execution():
         }
 
 
-def check_render_output():
-    render_path = OUTPUT_DIR / "render.png"
+def check_render_output(output_dir):
+    render_path = output_dir / "render.png"
 
     if not render_path.exists():
         return {
@@ -171,8 +172,8 @@ def check_render_output():
     }
 
 
-def check_ovphysx_execution():
-    summary_path = OUTPUT_DIR / "summary.json"
+def check_ovphysx_execution(output_dir):
+    summary_path = output_dir / "summary.json"
 
     if not summary_path.exists():
         return {
@@ -208,8 +209,8 @@ def check_ovphysx_execution():
 
 
 
-def check_physics_output_exists():
-    physics_path = OUTPUT_DIR / "physics_results.json"
+def check_physics_output_exists(output_dir):
+    physics_path = output_dir / "physics_results.json"
 
     if not physics_path.exists():
         return {
@@ -235,8 +236,8 @@ def check_physics_output_exists():
     }
 
 
-def check_pose_changed():
-    physics_path = OUTPUT_DIR / "physics_results.json"
+def check_pose_changed(output_dir):
+    physics_path = output_dir / "physics_results.json"
 
     if not physics_path.exists():
         return {
@@ -267,6 +268,132 @@ def check_pose_changed():
             "name": "pose_changed",
             "status": "FAIL",
             "message": f"Could not evaluate pose change: {e}"
+        }
+
+
+def check_rigidbody_mass(asset_path, prim_path):
+    try:
+        stage, prim = get_prim(asset_path, prim_path)
+
+        if prim is None:
+            return {
+                "name": "rigidbody_has_mass",
+                "status": "FAIL",
+                "message": f"Could not find prim {prim_path}",
+                "prim_path": prim_path
+            }
+
+        mass_attr = prim.GetAttribute("physics:mass")
+        value = mass_attr.Get() if mass_attr and mass_attr.IsValid() else None
+
+        if value is None or value <= 0:
+            return {
+                "name": "rigidbody_has_mass",
+                "status": "FAIL",
+                "message": f"Rigid body does not have a valid mass: {value}",
+                "prim_path": prim_path
+            }
+
+        return {
+            "name": "rigidbody_has_mass",
+            "status": "PASS",
+            "message": f"Rigid body mass is {value}",
+            "prim_path": prim_path
+        }
+
+    except Exception as e:
+        return {
+            "name": "rigidbody_has_mass",
+            "status": "FAIL",
+            "message": f"Mass check failed: {e}",
+            "prim_path": prim_path
+        }
+
+
+def check_rigidbody_collider(asset_path, prim_path):
+    try:
+        stage, prim = get_prim(asset_path, prim_path)
+
+        if prim is None:
+            return {
+                "name": "rigidbody_has_collider",
+                "status": "FAIL",
+                "message": f"Could not find prim {prim_path}",
+                "prim_path": prim_path
+            }
+
+        has_collider = any(
+            descendant.HasAPI(UsdPhysics.CollisionAPI)
+            for descendant in Usd.PrimRange(prim)
+        )
+
+        if not has_collider:
+            return {
+                "name": "rigidbody_has_collider",
+                "status": "FAIL",
+                "message": "Rigid body has no collider",
+                "prim_path": prim_path
+            }
+
+        return {
+            "name": "rigidbody_has_collider",
+            "status": "PASS",
+            "message": "Rigid body has a collider",
+            "prim_path": prim_path
+        }
+
+    except Exception as e:
+        return {
+            "name": "rigidbody_has_collider",
+            "status": "FAIL",
+            "message": f"Collider check failed: {e}",
+            "prim_path": prim_path
+        }
+
+
+
+def check_material_bindings(asset_path):
+    try:
+        stage = Usd.Stage.Open(str(asset_path))
+
+        if stage is None:
+            return {
+                "name": "material_bindings_resolve",
+                "status": "FAIL",
+                "message": "Could not open USD stage"
+            }
+
+        unbound_meshes = []
+
+        for prim in stage.Traverse():
+            if not prim.IsA(UsdGeom.Gprim):
+                continue
+
+            binding_api = UsdShade.MaterialBindingAPI(prim)
+            material, _ = binding_api.ComputeBoundMaterial()
+
+            if not material or not material.GetPrim().IsValid():
+                unbound_meshes.append(str(prim.GetPath()))
+
+        if unbound_meshes:
+            return {
+                "name": "material_bindings_resolve",
+                "status": "FAIL",
+                "message": "One or more renderable meshes have no resolved material binding",
+                "details": unbound_meshes
+            }
+
+        return {
+            "name": "material_bindings_resolve",
+            "status": "PASS",
+            "message": "All renderable meshes have resolved material bindings"
+        }
+
+    except Exception as e:
+        return {
+            "name": "material_bindings_resolve",
+            "status": "FAIL",
+            "message": f"Material binding check failed: {e}"
         }
 
 def get_prim(asset_path, prim_path):
@@ -384,8 +511,7 @@ def check_cooling_type(asset_path, prim_path):
 
 
     
-def build_evaluation():
-    asset_path = ROOT / "assets" / "published" / "scenes" / "rack_render.usda"
+def build_evaluation(asset_path, output_dir, require_runtime=True):
     rack_prim_path = "/World/Rack"
     structural_checks = [
         check_stage_opens(asset_path),
@@ -393,16 +519,30 @@ def build_evaluation():
         check_composition_errors(asset_path)
     ]
 
-    render_checks = [
-        check_ovrtx_execution(),
-        check_render_output()
-    ]
+    # material_bindings_resolve is a static asset check — it always runs.
+    # ovrtx_execution / render_output_exists are runtime smoke tests: did the
+    # real consumer actually execute. Those only apply when evaluating a
+    # real demo.py run, not when evaluating a fixture in isolation.
+    render_checks = [check_material_bindings(asset_path)]
+    if require_runtime:
+        render_checks = [
+            check_ovrtx_execution(output_dir),
+            check_render_output(output_dir),
+        ] + render_checks
 
+    # rigidbody_has_mass / rigidbody_has_collider are static asset checks —
+    # they always run. ovphysx_execution / physics_output_exists /
+    # pose_changed are runtime smoke tests, same reasoning as above.
     physics_checks = [
-        check_ovphysx_execution(),
-        check_physics_output_exists(),
-        check_pose_changed()
+        check_rigidbody_mass(asset_path, rack_prim_path),
+        check_rigidbody_collider(asset_path, rack_prim_path),
     ]
+    if require_runtime:
+        physics_checks = [
+            check_ovphysx_execution(output_dir),
+            check_physics_output_exists(output_dir),
+            check_pose_changed(output_dir),
+        ] + physics_checks
 
     domain_checks = [
         check_nominal_power(asset_path, rack_prim_path),
@@ -443,10 +583,10 @@ def build_evaluation():
     return evaluation
 
 
-def save_evaluation(evaluation):
-    OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+def save_evaluation(evaluation, output_dir):
+    output_dir.mkdir(parents=True, exist_ok=True)
 
-    output_file = OUTPUT_DIR / "evaluation.json"
+    output_file = output_dir / "evaluation.json"
 
     with open(output_file, "w") as f:
         json.dump(evaluation, f, indent=2)
@@ -454,48 +594,48 @@ def save_evaluation(evaluation):
     print(f"Evaluation written to: {output_file}")
 
 
-def save_evaluation_markdown(evaluation):
-    OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+def save_evaluation_markdown(evaluation, output_dir):
+    output_dir.mkdir(parents=True, exist_ok=True)
+
     lines = []
-    for category_name, category in evaluation["categories"].items():
-        lines.append(f"## {category_name.title()} — {category['status']}")
-        lines.append("")
-    
-        for check in category["checks"]:
-            line = f"- {check['status']} — {check['name']}: {check['message']}"
-        
-            if "prim_path" in check:
-                line += f" (`{check['prim_path']}`)"
-        
-            if "artifact" in check:
-                line += f" — artifact: `{check['artifact']}`"
-        
-            lines.append(line)
-
-        lines.append("## Conclusion")
-        lines.append("")
-        
-        if evaluation["overall_status"] == "PASS":
-            lines.append(
-                "The asset satisfied all blocking POC evaluation categories."
-            )
-        else:
-            lines.append(
-                "The asset did not satisfy all blocking POC evaluation categories."
-            )
-        
-        lines.append("")
-        
-    output_file = OUTPUT_DIR / "evaluation.md"
-
-    
-
     lines.append("# SimReady POC Evaluation")
     lines.append("")
     lines.append(f"**Asset:** `{evaluation['asset']}`")
     lines.append("")
     lines.append(f"**Overall Result:** {evaluation['overall_status']}")
     lines.append("")
+
+    for category_name, category in evaluation["categories"].items():
+        lines.append(f"## {category_name.title()} — {category['status']}")
+        lines.append("")
+
+        for check in category["checks"]:
+            line = f"- {check['status']} — {check['name']}: {check['message']}"
+
+            if "prim_path" in check:
+                line += f" (`{check['prim_path']}`)"
+
+            if "artifact" in check:
+                line += f" — artifact: `{check['artifact']}`"
+
+            lines.append(line)
+
+        lines.append("")
+
+    lines.append("## Conclusion")
+    lines.append("")
+
+    if evaluation["overall_status"] == "PASS":
+        lines.append(
+            "The asset satisfied all blocking POC evaluation categories."
+        )
+    else:
+        lines.append(
+            "The asset did not satisfy all blocking POC evaluation categories."
+        )
+    lines.append("")
+
+    output_file = output_dir / "evaluation.md"
 
     with open(output_file, "w") as f:
         f.write("\n".join(lines))
@@ -504,7 +644,10 @@ def save_evaluation_markdown(evaluation):
 
 
 if __name__ == "__main__":
-    result = build_evaluation()
+    asset_path = Path(sys.argv[1])
+    output_dir = OUTPUT_DIR
 
-    save_evaluation(result)
-    save_evaluation_markdown(result)
+    result = build_evaluation(asset_path, output_dir)
+
+    save_evaluation(result, output_dir)
+    save_evaluation_markdown(result, output_dir)
