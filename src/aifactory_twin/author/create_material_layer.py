@@ -9,12 +9,12 @@ stage = Usd.Stage.CreateNew(str(OUTPUT_PATH))
 
 material = UsdShade.Material.Define(
     stage,
-    "/Looks/RackMaterial"
+    "/Rack/Looks/RackMaterial"
 )
 
 shader = UsdShade.Shader.Define(
     stage,
-    "/Looks/RackMaterial/Shader"
+    "/Rack/Looks/RackMaterial/Shader"
 )
 
 shader.CreateIdAttr("UsdPreviewSurface")

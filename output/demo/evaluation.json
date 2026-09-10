@@ -34,7 +34,12 @@
           "name": "render_output_exists",
           "status": "PASS",
           "message": "OVRTX produced a non-empty render output",
-          "artifact": "/home/as22cq/Projects/aifactory-twin/output/demo/render.png"
+          "artifact": "/Users/shauryatiwari/Desktop/Projects/gits/ai-factory-twin/output/demo/render.png"
+        },
+        {
+          "name": "material_bindings_resolve",
+          "status": "PASS",
+          "message": "All renderable meshes have resolved material bindings"
         }
       ]
     },
@@ -50,12 +55,24 @@
           "name": "physics_output_exists",
           "status": "PASS",
           "message": "Physics result artifact was produced",
-          "artifact": "/home/as22cq/Projects/aifactory-twin/output/demo/physics_results.json"
+          "artifact": "/Users/shauryatiwari/Desktop/Projects/gits/ai-factory-twin/output/demo/physics_results.json"
         },
         {
           "name": "pose_changed",
           "status": "PASS",
           "message": "Rigid-body pose changed after OVPhysX simulation"
+        },
+        {
+          "name": "rigidbody_has_mass",
+          "status": "PASS",
+          "message": "Rigid body mass is 1000.0",
+          "prim_path": "/World/Rack"
+        },
+        {
+          "name": "rigidbody_has_collider",
+          "status": "PASS",
+          "message": "Rigid body has a collider",
+          "prim_path": "/World/Rack"
         }
       ]
     },
