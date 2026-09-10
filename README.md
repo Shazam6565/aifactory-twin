@@ -5,9 +5,13 @@
 Raw vendor assets in. A validated, layered, instanced, multi-consumer OpenUSD scene out —
 plus a CI gate that fails the build when the scene is not simulation-ready.
 
-> **Status: M0 (architecture) complete. No pipeline code yet.**
+> **Status: the rack component, CPU-side validation, and both GPU consumers (OVRTX render,
+> OVPhysX physics) all run end-to-end.** A standalone asset evaluator (`evaluation.py`) and a
+> five-fixture regression suite (`run_fixtures.py`) prove the validation contract correctly
+> classifies each class of defect. `datahall.usda` scales to N scenegraph-instanced racks; a
+> registered `UsdValidation` gate and floor-tile point instancing are not built yet.
 > Every milestone below is marked honestly. Nothing is claimed until it runs.
-> See [Status](#status).
+> See [Status](#status) and [POC_SCOPE.MD](POC_SCOPE.MD).
 
 ---
 
@@ -116,6 +120,7 @@ source of truth across disciplines, demonstrated rather than asserted.
 ```
 aifactory-twin/
 ├── SCOPE.md                     # THE CONTRACT — what this repo does and does not claim
+├── POC_SCOPE.MD                 # the POC's customer story, hypothesis, success/kill criteria
 ├── README.md                    # this file — the reference architecture
 ├── ARCHITECTURE.md              # current, as-built V1 architecture story
 ├── DESIGN_NOTES.md              # layer strategy, composition decisions, decision log
@@ -123,21 +128,34 @@ aifactory-twin/
 ├── BENCHMARKS.md                # CPU-only method stated; numbers unpopulated
 ├── docs/GETTING_STARTED.md      # step-by-step build order
 │
+├── demo.py                      # runs validation → OVRTX render → OVPhysX physics, end to end
+├── evaluation.py                # evaluate any USD scene's sim-readiness — see below
+├── run_fixtures.py              # regression suite: each fixture must fail for its own reason
+│
 ├── assets/
 │   ├── source/                  # raw inputs — NEVER edited in place
 │   └── published/               # pipeline OUTPUT — NEVER hand-edited
 │       ├── components/          # per-component SimReady assets
 │       └── scenes/              # assembled scenes
 │
+├── examples/fixtures/           # one deliberate defect per fixture, used by run_fixtures.py
+│   ├── valid/                   #   every check passes
+│   ├── missing_mass/            #   fails rigidbody_has_mass only
+│   ├── missing_collider/        #   fails rigidbody_has_collider only
+│   ├── broken_material/         #   fails material_bindings_resolve only
+│   └── invalid_domain/          #   fails nominal_power_present only
+│
+├── output/                      # evaluator/demo output — render.png, evaluation.json/md, etc.
+│
 ├── src/aifactory_twin/
 │   ├── ingest/                  # source → normalized USD (units, naming, xforms, manifest)
 │   ├── author/                  # layer authoring (simready, domain, assemble)
 │   ├── optimize/                # instancing strategies
-│   ├── validate/                # built-in UsdValidation suite + 5 custom rules → report
+│   ├── validate/                # component-level custom rules + unloaded-stage query
 │   └── consume/                 # ovrtx render, ovphysx physics
 │
 ├── tests/broken/                # deliberately broken fixtures the gate must reject
-└── ci/validate.sh               # the gate
+└── ci/                          # not built yet — see Status
 ```
 
 **The discipline is the point.** `assets/source/` is never modified. `assets/published/` is
@@ -166,25 +184,36 @@ one, state it, enforce it in CI.
 
 ## Quickstart
 
-> Nothing below runs yet — this is the shape the pipeline will take. Working commands land as
-> milestones complete.
-
 ```bash
 uv sync            # CPU side only: usd-core + pytest. Never pulls anything GPU-related.
 
-# M1 — ingest a source asset into a normalized, layered component
-python -m aifactory_twin.ingest assets/source/rack_gb300.usda
+# normalize the vendor drop into a proxy-box geometry layer
+python src/aifactory_twin/ingest/normalize_rack.py
 
-# M4 — assemble a data hall with N racks
-python -m aifactory_twin.author.assemble --racks 512 --instancing scenegraph
+# author the physics / material / domain sublayers, then the interface layer
+python src/aifactory_twin/author/create_physics_layer.py
+python src/aifactory_twin/author/create_material_layer.py
+python src/aifactory_twin/author/create_domain_layer.py
+python src/aifactory_twin/author/create_rack_component.py
 
-# M5 — validate; this is the gate
-./ci/validate.sh assets/published/scenes/datahall.usda
+# component-level validation — the six consumer-fitness rules
+python src/aifactory_twin/validate/run.py
 
-# M6 — two independent consumers over one stage (Linux + NVIDIA GPU only;
-#      requires the opt-in under "Platform split" first)
-python -m aifactory_twin.consume.render_ovrtx   assets/published/scenes/datahall.usda
-python -m aifactory_twin.consume.physics_ovphysx assets/published/scenes/datahall.usda
+# read declared power draw with geometry unloaded (Usd.Stage.LoadNone)
+python src/aifactory_twin/validate/query_rack.py
+
+# assemble a data hall of N scenegraph-instanced racks
+python src/aifactory_twin/author/assemble.py --racks 512
+
+# evaluate any scene's sim-readiness — see "Testing your own asset" below
+python evaluation.py assets/published/scenes/rack_render.usda
+
+# regression suite: every fixture must fail for its own declared reason
+python run_fixtures.py
+
+# full runtime POC — validation, then OVRTX render, then OVPhysX physics
+# (Linux + NVIDIA GPU only; requires the opt-in under "Platform split" first)
+python demo.py
 ```
 
 ---
@@ -271,20 +300,33 @@ the pinned one resolves.
 
 One row per `SCOPE.md` deliverable. **A row reads `built` only when its done-condition in
 `SCOPE.md` is demonstrably met.** `designed, not built` is a deliberate exclusion, not pending
-work.
+work. `partial` means real, running code that does not yet meet the full stated condition —
+named honestly rather than rounded up.
 
 | # | Deliverable | Done when | Status |
 |---|---|---|---|
-| 1 | One layered component (`rack_gb300`) — interface layer, geometry payload, physics / material / domain sublayers | Each sublayer contains only its own opinions when opened in a text editor | ⬜ not started |
-| 2 | Unloaded-stage domain query | A script opens with `Usd.Stage.LoadNone` and prints power draw plus a composed prim count, no geometry loaded | ⬜ not started |
-| 3 | Six custom validators in `UsdValidation.ValidationRegistry` | They run alongside the 28 built-ins and report through the same `ValidationError` type | ⬜ not started |
-| 4 | `datahall.usda` — N racks scenegraph-instanced, floor tiles via `UsdGeomPointInstancer` | N is a CLI parameter; the gate passes at N = 64, 512, 4096 | ⬜ not started |
+| 1 | One layered component (`rack_gb300`) — interface layer, geometry payload, physics / material / domain sublayers | Each sublayer contains only its own opinions when opened in a text editor | ✅ built |
+| 2 | Unloaded-stage domain query | A script opens with `Usd.Stage.LoadNone` and prints power draw plus a composed prim count, no geometry loaded | ✅ built — `validate/query_rack.py`; prints a prim count, not yet a composed *count across N racks* |
+| 3 | Six custom validators in `UsdValidation.ValidationRegistry` | They run alongside the 28 built-ins and report through the same `ValidationError` type | 🟡 partial — the six rules exist in `validate/rules.py`, run via `validate/run.py`, and all pass; not yet registered into `UsdValidation.ValidationRegistry` alongside the built-ins |
+| 4 | `datahall.usda` — N racks scenegraph-instanced, floor tiles via `UsdGeomPointInstancer` | N is a CLI parameter; the gate passes at N = 64, 512, 4096 | 🟡 partial — `author/assemble.py --racks N` builds N scenegraph-instanced racks (demonstrated at N=4, committed); no floor tiles / `PointInstancer` yet, not demonstrated at N=512/4096 |
 | 5 | `ci/validate.sh` and a deliberately broken fixture | Running the gate against `tests/broken/` exits nonzero and names the offending prim | ⬜ not started |
 | — | Tier 3 engineering consistency — cross-prim comparison, aggregation | — | 📐 designed, not built |
 | — | LOD variant sets | — | 📐 designed, not built |
 
 Supporting docs, which exist but are not deliverables: `ARCHITECTURE.md`, `DESIGN_NOTES.md`,
 `SIMREADY_SPEC.md`, `SCOPE.md`, `BENCHMARKS.md` (method stated, numbers unpopulated).
+
+### POC evaluator and regression suite
+
+A second, separate initiative — not a `SCOPE.md` deliverable, scoped instead by
+[`POC_SCOPE.MD`](POC_SCOPE.MD) — proves the validation *contract* itself, and that the two GPU
+consumers actually execute:
+
+| Deliverable | Status |
+|---|---|
+| `demo.py` — validation → OVRTX render → OVPhysX physics, one command | ✅ built and run on GPU hardware — `output/demo/{render.png, physics_results.json, summary.json}` are the committed evidence |
+| `evaluation.py` — 4-category sim-readiness evaluator for any scene | ✅ built — see [Testing your own asset's sim-readiness](#testing-your-own-assets-sim-readiness) below |
+| `run_fixtures.py` + `examples/fixtures/` — 5-fixture regression suite | ✅ built — each fixture fails for exactly one declared reason; `Fixture suite: PASS` |
 
 ---
 
@@ -305,33 +347,92 @@ otherwise catch the project overclaiming.
 
 ---
 
-## How to adapt this to your assets
+## Testing your own asset's sim-readiness
 
-There are two ways in, and the second is probably the one you want.
-
-**Just validate a twin you already have** — the validator takes any USD stage and does not
-assume this repo produced it (ADR-11):
+`evaluation.py` takes any composed USD scene and reports whether it is usable by its intended
+consumers — not just whether it is valid USD (ADR-11 in `DESIGN_NOTES.md`: it does not assume
+this repo produced the asset):
 
 ```bash
-./ci/validate.sh /path/to/your/scene.usda
+python evaluation.py /path/to/your/scene.usda
 ```
 
-**Run your assets through the whole pipeline:**
+This writes `output/demo/evaluation.json` and `output/demo/evaluation.md`, and checks four
+independent categories:
+
+| Category | Checks | Static or runtime |
+|---|---|---|
+| **structural** | stage opens, `defaultPrim` is valid, no composition errors | static — reads only the asset |
+| **render** | material bindings resolve on every `Gprim`; plus, when evaluating a real `demo.py` run, that OVRTX actually executed and produced an image | static + runtime |
+| **physics** | every `RigidBodyAPI` prim has mass and a collider; plus, when evaluating a real `demo.py` run, that OVPhysX actually executed and the pose changed | static + runtime |
+| **domain** | engineering metadata (`aifactory:electrical:...`, `aifactory:thermal:...`) is present and non-zero on the rack prim | static — reads only the asset |
+
+The static checks run on the asset alone and need no GPU. The runtime checks
+(`ovrtx_execution`, `render_output_exists`, `ovphysx_execution`, `physics_output_exists`,
+`pose_changed`) read `output_dir/summary.json`, `render.png`, and `physics_results.json` — the
+artifacts a real `demo.py` run produces — and only make sense there
+(`build_evaluation(asset_path, output_dir, require_runtime=...)`). `run_fixtures.py` sets
+`require_runtime=False` so a fixture with no `demo.py` run behind it is judged purely on its
+own USD content.
+
+A `FAIL` in any single check fails its whole category; any category `FAIL` fails
+`overall_status`. The output names the exact check and prim:
+
+```json
+{
+  "name": "nominal_power_present",
+  "status": "FAIL",
+  "message": "Nominal power draw is invalid: 0.0",
+  "prim_path": "/World/Rack"
+}
+```
+
+**Prove the evaluator itself is trustworthy before trusting its verdict on your asset** — run
+the regression suite:
+
+```bash
+python run_fixtures.py
+```
+
+This runs the static checks (no GPU, no `demo.py` run needed) against five fixtures under
+`examples/fixtures/`, each with exactly one deliberate defect, and asserts each one fails in
+the expected category and nowhere else:
+
+```
+valid              PASS   — every static check passes
+missing_mass       FAIL   — physics.rigidbody_has_mass only
+missing_collider   FAIL   — physics.rigidbody_has_collider only
+broken_material    FAIL   — render.material_bindings_resolve only
+invalid_domain     FAIL   — domain.nominal_power_present only
+
+Fixture suite: PASS
+```
+
+If you are adding your own domain rule, the fixture pattern is the fastest way to prove it
+fires — and only on the case it is meant to catch: clone `examples/fixtures/valid/`, break
+exactly one value, register the fixture and its expected failing category in
+`run_fixtures.py`'s `FIXTURES` dict.
+
+## How to adapt this to your assets
 
 1. Drop your source geometry in `assets/source/` and leave it alone forever.
 2. Edit the conventions table above if your site disagrees — then change the `valid_units`
    validator to match, so the convention and its enforcement never drift apart.
 3. Rewrite `SIMREADY_SPEC.md` for your domain. The electrical and thermal rules here are one
    worked example of a domain spec; yours will differ in content and not in shape.
-4. Add domain rules to `validate/rules.py`. The interface a rule implements is deliberately
-   small so that a domain expert who is not a USD expert can contribute one.
-5. Everything else — layering, instancing policy, the gate — should carry over unchanged.
+4. Add domain rules to `validate/rules.py`, and a matching static check to `evaluation.py`. The
+   interface a rule implements is deliberately small so that a domain expert who is not a USD
+   expert can contribute one.
+5. Add a fixture for the new rule under `examples/fixtures/` and register it in
+   `run_fixtures.py`, per the section above.
+6. Everything else — layering, instancing policy — should carry over unchanged.
 
 ---
 
 ## Further reading
 
 - [SCOPE.md](SCOPE.md) — **the contract.** What this repo claims, and what it does not
+- [POC_SCOPE.MD](POC_SCOPE.MD) — the POC's customer story, hypothesis, and success/kill criteria
 - [ARCHITECTURE.md](ARCHITECTURE.md) — the current, as-built V1 architecture story
 - [DESIGN_NOTES.md](DESIGN_NOTES.md) — layer strategy, LIVRPS reasoning, validation tiers, decision log
 - [SIMREADY_SPEC.md](SIMREADY_SPEC.md) — the three tiers and the six custom validators
